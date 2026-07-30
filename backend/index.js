@@ -29,7 +29,7 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT;
 const helmet = require('helmet');
 const compression = require('compression');
 

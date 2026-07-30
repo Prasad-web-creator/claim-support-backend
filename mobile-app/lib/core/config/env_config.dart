@@ -12,9 +12,8 @@ class EnvConfig {
     switch (env) {
       case Environment.prod:
         // In production, force HTTPS and use the production domain.
-        // For demonstration, we'll assume a configurable generic prod domain.
-        // This prevents localhost from ever leaking into production.
-        _apiBaseUrl = const String.fromEnvironment('API_BASE_URL', defaultValue: 'https://api.yourproductiondomain.com/api');
+        // We inject this securely via --dart-define during the build.
+        _apiBaseUrl = const String.fromEnvironment('API_BASE_URL', defaultValue: 'https://claim-support-backend-production.up.railway.app/api');
         break;
       case Environment.dev:
       default:
