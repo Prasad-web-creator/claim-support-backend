@@ -29,7 +29,7 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT;
 const helmet = require('helmet');
 const compression = require('compression');
 
@@ -133,6 +133,9 @@ app.get('/api/files/:id', authMiddleware, async (req, res) => {
 app.get('/', (req, res) => {
   res.send('Claim Support API is running');
 });
+
+// Ignore favicon requests from browsers to prevent 404 errors in logs
+app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 // Global Express Error Handler
 app.use((err, req, res, next) => {
