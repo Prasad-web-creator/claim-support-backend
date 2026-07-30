@@ -8,7 +8,7 @@ const authMiddleware = require('./src/middleware/authMiddleware');
 
 const requiredEnvVars = ['JWT_SECRET', 'GROQ_API_KEY', 'GEMINI_API_KEY', 'MONGODB_URI'];
 if (process.env.NODE_ENV === 'production') {
-  requiredEnvVars.push('ALLOWED_ORIGINS', 'REDIS_URL');
+  requiredEnvVars.push('ALLOWED_ORIGINS');
 }
 
 for (const envVar of requiredEnvVars) {

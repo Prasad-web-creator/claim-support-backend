@@ -1,11 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
-const IORedis = require('ioredis');
-
-const redisClient = new IORedis(process.env.REDIS_URL || 'redis://127.0.0.1:6379', {
-  maxRetriesPerRequest: 1, // Don't hang health checks
-});
 
 // @route   GET /api/health
 // @desc    Liveness probe (Basic app health)
@@ -14,26 +9,17 @@ router.get('/', (req, res) => {
 });
 
 // @route   GET /api/health/ready
-// @desc    Readiness probe (Database & Redis health)
+// @desc    Readiness probe (Database health)
 router.get('/ready', async (req, res) => {
   try {
     const mongoStatus = mongoose.connection.readyState === 1 ? 'UP' : 'DOWN';
     
-    let redisStatus = 'DOWN';
-    try {
-      await redisClient.ping();
-      redisStatus = 'UP';
-    } catch (err) {
-      redisStatus = 'DOWN';
-    }
-
-    const isReady = mongoStatus === 'UP' && redisStatus === 'UP';
+    const isReady = mongoStatus === 'UP';
 
     res.status(isReady ? 200 : 503).json({
       status: isReady ? 'UP' : 'DOWN',
       checks: {
         mongodb: mongoStatus,
-        redis: redisStatus,
       },
       timestamp: new Date()
     });
