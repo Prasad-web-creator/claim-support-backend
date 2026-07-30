@@ -1,0 +1,212 @@
+# ==============================================================================
+# Claim Support - Production .gitignore
+# Contains merged configurations for Flutter, Node.js/Express, AI & MongoDB
+# ==============================================================================
+
+# ==============================================================================
+# 1. Operating System Files
+# ==============================================================================
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Linux
+*~
+.directory
+
+# ==============================================================================
+# 2. IDE / Editors
+# ==============================================================================
+# IntelliJ / Android Studio
+*.iml
+*.ipr
+*.iws
+.idea/
+out/
+gen/
+
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Other Editors
+*.swp
+*.swo
+.atom/
+.history/
+
+# ==============================================================================
+# 3. Environment Variables & Secrets
+# ==============================================================================
+# (Secures JWT secrets, MongoDB URIs, AI API Keys, OAuth credentials, etc.)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+secrets.json
+auth.json
+service-account.json
+credentials.json
+firebase-adminsdk-*.json
+client_secret*.json
+
+# ==============================================================================
+# 4. Logs
+# ==============================================================================
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ==============================================================================
+# 5. Flutter / Dart Mobile App
+# ==============================================================================
+# Core Flutter
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+.flutter-versions
+.pub-cache/
+.pub/
+build/
+coverage/
+flutter_analyze.txt
+
+# Symbolication & Obfuscation
+app.*.symbols
+app.*.map.json
+
+# Android Specific
+mobile-app/android/.gradle/
+mobile-app/android/local.properties
+mobile-app/android/app/debug/
+mobile-app/android/app/profile/
+mobile-app/android/app/release/
+mobile-app/android/app/build/
+*.jks
+*.keystore
+key.properties
+
+# iOS Specific
+mobile-app/ios/Pods/
+mobile-app/ios/.symlinks/
+mobile-app/ios/Flutter/Flutter.podspec
+mobile-app/ios/Flutter/.last_build_id
+mobile-app/ios/Flutter/App.framework
+mobile-app/ios/Flutter/Flutter.framework
+mobile-app/ios/Flutter/Generated.xcconfig
+mobile-app/ios/Flutter/app.flx
+mobile-app/ios/Flutter/app.zip
+mobile-app/ios/Flutter/flutter_assets/
+mobile-app/ios/Flutter/flutter_export_environment.sh
+*.mode1v3
+*.mode2v3
+*.pbxuser
+!default.pbxuser
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+*.xccheckout
+*.moved-aside
+DerivedData/
+*.hmap
+*.ipa
+*.xcuserstate
+
+# Generated code / Plugins
+GeneratedPluginRegistrant.*
+*.g.dart
+*.freezed.dart
+
+# ==============================================================================
+# 6. Node.js / Express Backend
+# ==============================================================================
+# Node core
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/
+!.yarn/patches
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+
+# Caches
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+
+# Build artifacts and temp
+dist/
+tmp/
+temp/
+uploads/
+logs/
+debug/
+
+# Package locks backup
+package-lock.json.backup
+yarn.lock.backup
+
+# ==============================================================================
+# 7. MongoDB / GridFS
+# ==============================================================================
+dump/
+*.bson
+*.json.gz
+*.archive
+/data/db/
+/db/
+mongodb_dumps/
+
+# ==============================================================================
+# 8. AI & OCR Processing
+# ==============================================================================
+# Temporary extractions
+ai-cache/
+ocr-temp/
+*.pdf.txt
+*.ocr.json
