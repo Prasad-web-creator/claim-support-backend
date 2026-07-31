@@ -134,6 +134,9 @@ app.get('/', (req, res) => {
   res.send('Claim Support API is running');
 });
 
+// Ignore favicon requests from browsers to prevent 404 errors in logs
+app.get('/favicon.ico', (req, res) => res.status(204).end());
+
 // Global Express Error Handler
 app.use((err, req, res, next) => {
   logger.error(`[Express Error] ${err.message}`, { stack: err.stack });
