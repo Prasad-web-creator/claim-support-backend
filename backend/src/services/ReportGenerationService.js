@@ -56,6 +56,16 @@ function generateReport(policyJson, prescriptionJson, businessRuleResults, cover
   }
 
   const report = {
+    documentValidity: coverageAnalysis.documentValidity || {
+      prescriptionValid: true,
+      policyValid: true,
+      injectionAttemptDetected: false,
+      injectionAttemptDetails: '',
+      detectedDocumentTypeIfInvalid: ''
+    },
+    overallStatus: coverageAnalysis.overallStatus || coverageStatus,
+    overallConfidence: coverageAnalysis.overallConfidence !== undefined ? coverageAnalysis.overallConfidence : confidenceScore,
+    summary: coverageAnalysis.summary || summaryText,
     coverageStatus,
     confidenceScore,
     policySummary,

@@ -110,8 +110,8 @@ async function extractJsonMultimodal(
     if (!activeSignal) {
         internalAbortController = new AbortController();
         activeSignal = internalAbortController.signal;
-        // 45 second strict timeout per request
-        setTimeout(() => internalAbortController.abort('Gemini API timeout exceeded'), 45000).unref();
+        // 90 second timeout per request to allow for thorough multimodal analysis on large documents
+        setTimeout(() => internalAbortController.abort('Gemini API timeout exceeded'), 90000).unref();
     }
 
     try {

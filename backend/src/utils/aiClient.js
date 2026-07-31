@@ -11,13 +11,13 @@ const logger = require('./logger');
  */
 function parseAiJsonResponse(text) {
     if (!text) throw new Error('AI returned an empty response.');
-    
+
     let cleanText = text.trim();
-    
+
     // Attempt to extract JSON if wrapped in markdown or conversational text
     const firstBrace = cleanText.indexOf('{');
     const firstBracket = cleanText.indexOf('[');
-    
+
     // Find the earliest starting JSON character
     let startIndex = -1;
     if (firstBrace !== -1 && firstBracket !== -1) {
@@ -39,7 +39,7 @@ function parseAiJsonResponse(text) {
             cleanText = cleanText.substring(0, lastTicks).trim();
         }
     }
-    
+
     // Common hallucination: trailing commas before closing braces
     cleanText = cleanText.replace(/,\s*([\]}])/g, '$1');
 
@@ -85,8 +85,8 @@ async function extractJsonWithRetry(systemPrompt, userContent, modelName = proce
         if (!activeSignal) {
             internalAbortController = new AbortController();
             activeSignal = internalAbortController.signal;
-            // 45 second strict timeout per request
-            setTimeout(() => internalAbortController.abort('Gemini API timeout exceeded'), 45000).unref();
+            // 90 second timeout per request to allow for thorough coverage analysis on large documents
+            setTimeout(() => internalAbortController.abort('Gemini API timeout exceeded'), 90000).unref();
         }
 
         try {
@@ -98,7 +98,7 @@ async function extractJsonWithRetry(systemPrompt, userContent, modelName = proce
                     currentPrompt += `\n\nThe parser failed with this error: ${lastError.message}. Fix the JSON structure.`;
                 }
             }
-            
+
             const model = genAI.getGenerativeModel({
                 model: modelName,
                 systemInstruction: currentPrompt,
@@ -117,8 +117,6 @@ async function extractJsonWithRetry(systemPrompt, userContent, modelName = proce
             const extractedJson = parseAiJsonResponse(content);
 
             const processingTimeMs = Date.now() - startTime;
-            
-
 
             return {
                 extractedJson,
@@ -134,18 +132,18 @@ async function extractJsonWithRetry(systemPrompt, userContent, modelName = proce
         } catch (error) {
             lastError = error;
             retryCount++;
-            
+
             logger.error(`[AI Client] Attempt ${retryCount} failed: ${error.message}`, { stack: error.stack });
-            
+
             if (retryCount <= maxRetries) {
                 // Exponential Backoff with Jitter: 2s, 4s, 8s... + up to 1s random jitter
-                let delayMs = (Math.pow(2, retryCount) * 1000) + (Math.random() * 1000); 
-                
+                let delayMs = (Math.pow(2, retryCount) * 1000) + (Math.random() * 1000);
+
                 // If explicit rate limit (429)
                 if (error.message.includes('429')) {
                     delayMs = Math.max(delayMs, 5000); // Wait at least 5s for 429
                 }
-                
+
                 logger.warn(`[AI Client] Backing off for ${Math.round(delayMs)}ms...`);
                 await new Promise(resolve => setTimeout(resolve, delayMs));
             }

@@ -16,8 +16,8 @@ class ApiClient {
   ApiClient._internal() {
     dio = Dio(BaseOptions(
       baseUrl: EnvConfig.apiBaseUrl,
-      connectTimeout: const Duration(seconds: 30), // Tighter timeouts for production
-      receiveTimeout: const Duration(seconds: 30),
+      connectTimeout: const Duration(seconds: 60),
+      receiveTimeout: const Duration(seconds: 120),
     ));
 
     dio.interceptors.add(AuthInterceptor());

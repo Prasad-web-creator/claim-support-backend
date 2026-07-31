@@ -97,6 +97,8 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
           statusBorder = isDark ? warningAmber.withAlpha(50) : const Color(0xFFFDE68A);
         }
 
+        final bool isInvalid = overallStatus.startsWith('Invalid');
+
         return Scaffold(
           backgroundColor: theme.scaffoldBackgroundColor,
           body: SafeArea(
@@ -172,8 +174,9 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                         const SizedBox(height: 20),
                         Text(
                           overallStatus,
+                          textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: 22,
+                            fontSize: 20,
                             fontWeight: FontWeight.w800,
                             color: textColor,
                           ),
@@ -202,9 +205,10 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // ─── Policy Summary ───
-                  if (policyJson.isNotEmpty)
-                    _buildInfoCard(
+                  if (!isInvalid) ...[
+                    // ─── Policy Summary ───
+                    if (policyJson.isNotEmpty)
+                      _buildInfoCard(
                       isDark: isDark,
                       theme: theme,
                       title: 'Policy Summary',
@@ -378,10 +382,139 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                     const SizedBox(height: 24),
                   ],
 
+                  // ─── Detailed Coverage Explanations ───
+                  if (comparison.isNotEmpty) ...[
+                    Text(
+                      'Coverage Decision Details',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ...comparison.map((item) {
+                      final status = (item['status'] ?? item['coverageStatus'] ?? 'Not Covered').toString();
+                      final isCovered = status == 'Covered';
+                      final isPartial = status == 'Partially Covered';
 
+                      Color itemColor;
+                      Color itemBg;
+                      Color itemBorder;
+                      IconData itemIcon;
 
+                      if (isCovered) {
+                        itemColor = successGreen;
+                        itemBg = isDark ? successGreen.withAlpha(15) : const Color(0xFFECFDF5);
+                        itemBorder = isDark ? successGreen.withAlpha(40) : const Color(0xFFA7F3D0);
+                        itemIcon = Icons.check_circle_outline;
+                      } else if (isPartial) {
+                        itemColor = warningAmber;
+                        itemBg = isDark ? warningAmber.withAlpha(15) : const Color(0xFFFFFBEB);
+                        itemBorder = isDark ? warningAmber.withAlpha(40) : const Color(0xFFFDE68A);
+                        itemIcon = Icons.rule_folder_outlined;
+                      } else {
+                        itemColor = dangerRed;
+                        itemBg = isDark ? dangerRed.withAlpha(15) : const Color(0xFFFEF2F2);
+                        itemBorder = isDark ? dangerRed.withAlpha(40) : const Color(0xFFFECACA);
+                        itemIcon = Icons.cancel_outlined;
+                      }
 
-                  // ─── Disclaimer ───
+                      final reason = (item['explanation'] ?? item['reason'] ?? item['coverageStatusReason'] ?? '').toString().trim();
+                      final policyEvidence = (item['policyEvidence'] ?? '').toString().trim();
+                      final financialDecision = (item['financialDecision'] ?? '').toString().trim();
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: itemBg,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: itemBorder),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(itemIcon, color: itemColor, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    item['item'] ?? 'Unknown Item',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: textColor,
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: itemColor.withAlpha(25),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: itemColor.withAlpha(60)),
+                                  ),
+                                  child: Text(
+                                    status,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: itemColor,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (reason.isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              Text(
+                                reason,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: textSecondary,
+                                  height: 1.45,
+                                ),
+                              ),
+                            ],
+                            if (policyEvidence.isNotEmpty && policyEvidence != "No matching policy clause found.") ...[
+                              const SizedBox(height: 8),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.gavel_outlined, size: 14, color: primaryBlue),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      'Policy Evidence: $policyEvidence',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: primaryBlue,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                            if (financialDecision.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                'Financial Note: $financialDecision',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                  color: textSecondary,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 24),
+                  ],
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -420,6 +553,8 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                       ],
                     ),
                   ),
+                  ], // End of !isInvalid check
+                  
                   const SizedBox(height: 32),
 
                   // ─── Back to Dashboard Button ───

@@ -331,24 +331,22 @@ class DashboardScreen extends ConsumerWidget {
     Color statusColor;
     Color statusBgColor;
 
-    switch (report.overallStatus?.toLowerCase()) {
-      case 'covered':
-      case 'likely covered':
-        statusColor = const Color(0xFF059669);
-        statusBgColor = isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5);
-        break;
-      case 'partially covered':
-        statusColor = const Color(0xFFD97706);
-        statusBgColor = isDark ? const Color(0xFF78350F) : const Color(0xFFFEF3C7);
-        break;
-      case 'not covered':
-      case 'likely not covered':
-        statusColor = const Color(0xFFDC2626);
-        statusBgColor = isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEF2F2);
-        break;
-      default:
-        statusColor = isDark ? Colors.grey.shade300 : const Color(0xFF6B7280);
-        statusBgColor = isDark ? Colors.grey.shade800 : const Color(0xFFF3F4F6);
+    final statusLower = (report.overallStatus ?? '').toLowerCase();
+    if (statusLower == 'covered' || statusLower == 'approved' || statusLower == 'likely covered') {
+      statusColor = const Color(0xFF059669);
+      statusBgColor = isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5);
+    } else if (statusLower == 'partially covered' || statusLower == 'partially approved') {
+      statusColor = const Color(0xFFD97706);
+      statusBgColor = isDark ? const Color(0xFF78350F) : const Color(0xFFFEF3C7);
+    } else if (statusLower == 'not covered' || statusLower == 'rejected' || statusLower == 'likely not covered') {
+      statusColor = const Color(0xFFDC2626);
+      statusBgColor = isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEF2F2);
+    } else if (statusLower.startsWith('invalid')) {
+      statusColor = const Color(0xFFD97706);
+      statusBgColor = isDark ? const Color(0xFF78350F) : const Color(0xFFFEF3C7);
+    } else {
+      statusColor = isDark ? Colors.grey.shade300 : const Color(0xFF6B7280);
+      statusBgColor = isDark ? Colors.grey.shade800 : const Color(0xFFF3F4F6);
     }
 
     return InkWell(
@@ -364,62 +362,66 @@ class DashboardScreen extends ConsumerWidget {
         ),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.grey.shade800 : const Color(0xFFF3F4F6),
-                shape: BoxShape.circle,
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey.shade800 : const Color(0xFFF3F4F6),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.description_outlined, color: isDark ? Colors.grey.shade300 : const Color(0xFF6B7280)),
               ),
-              child: Icon(Icons.description_outlined, color: isDark ? Colors.grey.shade300 : const Color(0xFF6B7280)),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    report.reportNumber != null ? 'Analyze Report ${report.reportNumber}' : report.title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
-                      color: isDark ? Colors.white : const Color(0xFF111827),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  if (report.createdAt != null)
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      DateFormat.yMMMd().format(report.createdAt!),
+                      report.reportNumber != null ? 'Analyze Report ${report.reportNumber}' : report.title,
                       style: TextStyle(
-                        fontSize: 13,
-                        color: isDark ? Colors.grey.shade400 : const Color(0xFF6B7280),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: isDark ? Colors.white : const Color(0xFF111827),
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: statusBgColor,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                report.overallStatus ?? 'Pending',
-                style: TextStyle(
-                  color: statusColor,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
+                    const SizedBox(height: 4),
+                    if (report.createdAt != null)
+                      Text(
+                        DateFormat.yMMMd().format(report.createdAt!),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? Colors.grey.shade400 : const Color(0xFF6B7280),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: statusBgColor,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    report.overallStatus ?? 'Pending',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }

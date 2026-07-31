@@ -41,7 +41,7 @@ const crudControllerFactory = (Model, entityName, searchableFields = []) => {
 
     getById: async (req, res) => {
       try {
-        const doc = await Model.findOne({ _id: req.params.id, userId: req.user.id, isDeleted: false });
+        const doc = await Model.findOne({ _id: req.params.id, userId: req.user.id });
         if (!doc) return res.status(404).json({ message: `${entityName} not found` });
         res.json(doc);
       } catch (error) {
@@ -53,7 +53,7 @@ const crudControllerFactory = (Model, entityName, searchableFields = []) => {
     update: async (req, res) => {
       try {
         const doc = await Model.findOneAndUpdate(
-          { _id: req.params.id, userId: req.user.id, isDeleted: false },
+          { _id: req.params.id, userId: req.user.id },
           { ...req.body, updatedBy: req.user.id },
           { new: true }
         );
@@ -74,54 +74,33 @@ const crudControllerFactory = (Model, entityName, searchableFields = []) => {
     },
 
     delete: async (req, res) => {
-      const session = await mongoose.startSession();
       try {
-        let doc;
-        await session.withTransaction(async () => {
-          // Soft Delete Main Entity
-          doc = await Model.findOneAndUpdate(
-            { _id: req.params.id, userId: req.user.id, isDeleted: false },
-            { isDeleted: true, updatedBy: req.user.id },
-            { new: true, session }
-          );
-          
-          if (!doc) {
-            throw new Error('NOT_FOUND');
-          }
+        // Hard Delete Main Entity permanently from DB
+        const doc = await Model.findOneAndDelete(
+          { _id: req.params.id, userId: req.user.id }
+        );
 
-          // Cascade Soft Deletes
-          if (entityName === 'Policy' || entityName === 'Prescription') {
-            const childQuery = entityName === 'Policy' ? { policyId: doc._id } : { prescriptionId: doc._id };
-            await AnalysisReport.updateMany(
-              { ...childQuery, userId: req.user.id, isDeleted: false },
-              { isDeleted: true, updatedBy: req.user.id },
-              { session }
-            );
-
-            await StoredFile.updateMany(
-              { documentId: doc._id, userId: req.user.id, isDeleted: false },
-              { isDeleted: true },
-              { session }
-            );
-          }
-
-          await ActivityLog.create([{
-            userId: req.user.id,
-            action: `Deleted ${entityName}`,
-            entityType: entityName,
-            entityId: doc._id,
-          }], { session });
-        });
-        
-        session.endSession();
-        res.json({ message: `${entityName} deleted successfully` });
-      } catch (error) {
-        await session.abortTransaction();
-        session.endSession();
-        logger.error(`[crudControllerFactory.delete] Error deleting ${entityName}: ${error.message}`, { stack: error.stack });
-        if (error.message === 'NOT_FOUND') {
+        if (!doc) {
           return res.status(404).json({ message: `${entityName} not found` });
         }
+
+        // Cascade Hard Deletes
+        if (entityName === 'Policy' || entityName === 'Prescription') {
+          const childQuery = entityName === 'Policy' ? { policyId: doc._id } : { prescriptionId: doc._id };
+          await AnalysisReport.deleteMany({ ...childQuery, userId: req.user.id });
+          await StoredFile.deleteMany({ documentId: doc._id, userId: req.user.id });
+        }
+
+        await ActivityLog.create({
+          userId: req.user.id,
+          action: `Permanently deleted ${entityName}`,
+          entityType: entityName,
+          entityId: doc._id,
+        });
+
+        res.json({ message: `${entityName} permanently deleted` });
+      } catch (error) {
+        logger.error(`[crudControllerFactory.delete] Error deleting ${entityName}: ${error.message}`, { stack: error.stack });
         res.status(500).json({ message: `Error deleting ${entityName}` });
       }
     },
@@ -130,7 +109,7 @@ const crudControllerFactory = (Model, entityName, searchableFields = []) => {
       try {
         const { page = 1, limit = 10, search, sortBy = 'createdAt', sortOrder = 'desc', ...filters } = req.query;
         
-        let query = { isDeleted: false, userId: req.user.id };
+        let query = { userId: req.user.id };
 
         // Apply filters
         Object.keys(filters).forEach(key => {

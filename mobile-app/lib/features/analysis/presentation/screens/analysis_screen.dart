@@ -52,7 +52,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen>
   void _simulateProgress() async {
     // Simulate stage progression for visual feedback
     for (int i = 0; i < _stageLabels.length; i++) {
-      await Future.delayed(Duration(milliseconds: 1500 + (i * 600)));
+      await Future.delayed(const Duration(milliseconds: 2200));
       if (!mounted || _hasError) return;
       
       setState(() {

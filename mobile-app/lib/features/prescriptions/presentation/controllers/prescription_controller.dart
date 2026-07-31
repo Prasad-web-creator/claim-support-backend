@@ -71,6 +71,15 @@ class PrescriptionNotifier extends AsyncNotifier<PaginationResponse<Prescription
     await repository.createPrescription(data);
     await fetchPrescriptions(isRefresh: true);
   }
+  Future<void> deletePrescription(String id) async {
+    try {
+      final repository = ref.read(prescriptionRepositoryProvider);
+      await repository.deletePrescription(id);
+      await fetchPrescriptions(isRefresh: true);
+    } catch (e) {
+      rethrow;
+    }
+  }
 }
 
 final prescriptionProvider = AsyncNotifierProvider<PrescriptionNotifier, PaginationResponse<Prescription>>(() {

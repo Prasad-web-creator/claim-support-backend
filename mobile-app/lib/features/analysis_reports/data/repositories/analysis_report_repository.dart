@@ -55,4 +55,23 @@ class AnalysisReportRepository {
       );
     }
   }
+  Future<void> deleteAnalysisReport(String id) async {
+    try {
+      await _dio.delete('/analysis/$id');
+    } on DioException catch (e, st) {
+      throw AppException(
+        statusCode: e.response?.statusCode,
+        message: e.response?.data?['message'] ?? e.message ?? 'Unknown error',
+        responseBody: e.response?.data,
+        originalException: e,
+        stackTrace: st,
+      );
+    } catch (e, st) {
+      throw AppException(
+        message: 'Failed to delete analysis report: $e',
+        originalException: e,
+        stackTrace: st,
+      );
+    }
+  }
 }
