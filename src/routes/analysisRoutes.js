@@ -214,18 +214,17 @@ router.post('/start', auth, aiLimiter, async (req, res) => {
       prescriptionJson: prescriptionJson,
       businessRules: businessRuleResults,
       coverageAnalysis: coverageAnalysis,
+      documentValidity: finalReport.documentValidity || coverageAnalysis.documentValidity,
       confidenceScore: finalReport.confidenceScore,
-      overallStatus: finalReport.coverageStatus,
+      overallStatus: finalReport.overallStatus || finalReport.coverageStatus,
+      overallConfidence: finalReport.overallConfidence !== undefined ? finalReport.overallConfidence : finalReport.confidenceScore,
+      summary: finalReport.summary || finalReport.summaryText,
       summaryText: finalReport.summaryText,
       comparison: finalReport.comparison,
       processingTimeMs: processingTimeMs,
       stages: stages,
       analysisVersion: '2.0.0'
     });
-
-    // --- Phase 4 Validation Logs ---
-    // --- Phase 4 Validation Logs (Hidden in prod) ---
-   
 
     await report.save();
     recordStage(stages, 'MongoDB Storage', stageStart, 'success');
@@ -391,6 +390,25 @@ router.get('/:id/prescription-json', auth, async (req, res) => {
     res.json(report.prescriptionJson || {});
   } catch (err) {
     logger.error(`[GET /api/analysis/:id/prescription-json] ${err.message}`, { stack: err.stack });
+    res.status(500).send('Server Error');
+  }
+});
+
+
+// =====================================================
+// @route   DELETE /api/analysis/:id
+// @desc    Delete a specific analysis report
+// @access  Private
+// =====================================================
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    const report = await AnalysisReport.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
+    if (!report) {
+      return res.status(404).json({ message: 'Analysis report not found or not authorized.' });
+    }
+    res.json({ message: 'Analysis report deleted successfully.' });
+  } catch (err) {
+    logger.error(`[DELETE /api/analysis/:id] ${err.message}`, { stack: err.stack });
     res.status(500).send('Server Error');
   }
 });

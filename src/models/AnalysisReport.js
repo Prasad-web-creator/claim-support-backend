@@ -105,7 +105,18 @@ const analysisReportSchema = new mongoose.Schema({
     warnings: [String],
   },
 
-  // --- Stage 8: AI Coverage Analysis ---
+  // --- Stage 8: AI Coverage Analysis & Document Validity ---
+  documentValidity: {
+    prescriptionValid: { type: Boolean, default: true },
+    policyValid: { type: Boolean, default: true },
+    injectionAttemptDetected: { type: Boolean, default: false },
+    injectionAttemptDetails: { type: String, default: '' },
+    detectedDocumentTypeIfInvalid: { type: String, default: '' },
+  },
+  overallStatus: { type: String },
+  overallConfidence: { type: Number },
+  summary: { type: String },
+
   coverageAnalysis: {
     coverageStatus: String,
     confidenceScore: Number,
@@ -133,18 +144,34 @@ const analysisReportSchema = new mongoose.Schema({
   policyText: { type: String },
   prescriptionText: { type: String },
 
-  // --- Backward Compatibility (populated by ReportGenerationService) ---
+  // --- Summary & Detailed Comparison Schema ---
   confidenceScore: { type: Number },
-  overallStatus: { type: String },
   summaryText: { type: String },
   comparison: [{
-    item: String,
-    required: String,
-    status: String,
-    isCovered: Boolean,
-    cost: { type: Number },
-    confidence: { type: Number },
-    reason: { type: String },
+    item: { type: String },
+    itemType: { type: String },
+    prescriptionCost: { type: Number, default: 0 },
+    cost: { type: Number, default: 0 }, // backward compatibility
+    coverageStatus: { type: String },
+    status: { type: String }, // backward compatibility
+    coverageStatusReason: { type: String },
+    policyLimit: { type: mongoose.Schema.Types.Mixed, default: null },
+    estimatedPayableAmount: { type: mongoose.Schema.Types.Mixed, default: null },
+    estimatedPatientPayable: { type: mongoose.Schema.Types.Mixed, default: null },
+    coPayment: { type: mongoose.Schema.Types.Mixed, default: null },
+    deductible: { type: mongoose.Schema.Types.Mixed, default: null },
+    waitingPeriodApplicable: { type: Boolean, default: false },
+    waitingPeriodVerified: { type: Boolean, default: false },
+    networkHospitalRequired: { type: Boolean, default: false },
+    cashlessEligible: { type: Boolean, default: false },
+    financialDecision: { type: String },
+    policyEvidence: { type: String },
+    prescriptionEvidence: { type: String },
+    confidence: { type: Number, default: 0 },
+    explanation: { type: String },
+    reason: { type: String }, // backward compatibility
+    isCovered: { type: Boolean },
+    required: { type: String },
   }],
 
   // --- Processing Metadata ---

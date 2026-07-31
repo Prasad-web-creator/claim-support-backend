@@ -146,6 +146,8 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   logger.info(`Server is running on ${PORT}`);
 });
+server.timeout = 180000; // 3 minutes for multi-stage AI processing
+server.headersTimeout = 190000;
