@@ -444,11 +444,11 @@ STEP 6 — FINAL DECISION (OVERALL CLAIM)
 ══════════════════════════════════════
 
 - If Step 0 failed → overallStatus = "Invalid Policy and Prescription - Cannot Process", "Invalid Policy - Cannot Process", or "Invalid Prescription - Cannot Process" depending on which document(s) failed.
-- If Step 0B failed → overallStatus = "Rejected - Policy Eligibility Failure"
+- If Step 0B failed → overallStatus = "Not Covered"
 - Else, based on comparison[] results:
-  - All items Covered → "Approved"
-  - Mixed Covered/Partially Covered/Not Covered → "Partially Approved"
-  - All items Not Covered → "Rejected"
+  - All items Covered → "Covered"
+  - Mixed Covered/Partially Covered/Not Covered → "Partially Covered"
+  - All items Not Covered → "Not Covered"
 
 ══════════════════════════════════════
 CONFIDENCE SCORING
@@ -630,23 +630,29 @@ ${JSON.stringify(businessRuleResults)}
       : parseConfidence(parsedResponse.overallConfidence);
 
     let derivedStatus = parsedResponse.overallStatus || 'Unknown';
-    const isTopLevelFailure = derivedStatus.startsWith('Invalid') || derivedStatus.startsWith('Rejected');
 
-    if (totalItems > 0 && !isTopLevelFailure) {
+    // Map any incoming Approved/Rejected variants to the strict 3 status values: Covered / Not Covered / Partially Covered
+    if (derivedStatus === 'Approved') derivedStatus = 'Covered';
+    if (derivedStatus === 'Rejected' || derivedStatus === 'Rejected - Policy Eligibility Failure') derivedStatus = 'Not Covered';
+    if (derivedStatus === 'Partially Approved') derivedStatus = 'Partially Covered';
+
+    const isInvalidDoc = derivedStatus.startsWith('Invalid');
+
+    if (totalItems > 0 && !isInvalidDoc) {
       if (coveredItemsCount === totalItems) {
-        derivedStatus = 'Approved';
+        derivedStatus = 'Covered';
       } else if (coveredItemsCount === 0) {
-        derivedStatus = 'Rejected';
+        derivedStatus = 'Not Covered';
       } else {
-        derivedStatus = 'Partially Approved';
+        derivedStatus = 'Partially Covered';
       }
     }
 
-    // If deterministic business rules explicitly blocked the claim, the coverage is 0%
+    // If deterministic business rules explicitly blocked the claim, the status is Not Covered
     if (businessRuleResults && businessRuleResults.overallEligible === false) {
       calculatedConfidence = 0;
-      if (!derivedStatus.startsWith('Invalid')) {
-        derivedStatus = 'Rejected - Policy Eligibility Failure';
+      if (!isInvalidDoc) {
+        derivedStatus = 'Not Covered';
       }
     }
 
