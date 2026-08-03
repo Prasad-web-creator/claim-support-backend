@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:claimsupport/features/prescriptions/data/models/prescription.dart';
 import 'package:claimsupport/features/prescriptions/presentation/controllers/prescription_controller.dart';
 import 'package:intl/intl.dart';
 
@@ -86,7 +87,7 @@ class PrescriptionListScreen extends ConsumerWidget {
                       }
 
                       final prescription = prescriptions[index];
-                      final label = 'Prescription ${prescription.sequenceNumber ?? ''}'.trim();
+                      final label = prescription.displayId;
                       return Dismissible(
                         key: ValueKey(prescription.id),
                         direction: DismissDirection.endToStart,
@@ -161,8 +162,19 @@ class PrescriptionListScreen extends ConsumerWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const SizedBox(height: 4),
+                                if (prescription.originalFileName != null && prescription.originalFileName!.isNotEmpty)
+                                  Text(
+                                    prescription.originalFileName!,
+                                    style: const TextStyle(fontSize: 13, color: Colors.grey),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                const SizedBox(height: 2),
                                 if (prescription.createdAt != null)
-                                  Text('Uploaded: ${DateFormat("MMM d, yyyy • hh:mm a").format(prescription.createdAt!.toLocal())}'),
+                                  Text(
+                                    DateFormat("dd-MM-yyyy hh:mm a").format(prescription.createdAt!.toLocal()),
+                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                  ),
                               ],
                             ),
                             trailing: IconButton(
@@ -172,7 +184,7 @@ class PrescriptionListScreen extends ConsumerWidget {
                             ),
                             onTap: () {
                               if (prescription.gridFsFileId != null) {
-                                context.push('/view-pdf/${prescription.gridFsFileId}?title=Prescription%20${prescription.sequenceNumber ?? ''}');
+                                context.push('/view-pdf/${prescription.gridFsFileId}?title=${prescription.displayId}');
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(content: Text('No PDF document attached to this prescription.')),

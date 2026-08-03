@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:claimsupport/features/policies/data/models/policy.dart';
 import 'package:claimsupport/features/policies/presentation/controllers/policy_controller.dart';
 import 'package:intl/intl.dart';
 
@@ -86,7 +87,7 @@ class PolicyListScreen extends ConsumerWidget {
                       }
 
                       final policy = policies[index];
-                      final label = 'Policy ${policy.sequenceNumber ?? ''}'.trim();
+                      final label = policy.displayId;
                       return Dismissible(
                         key: ValueKey(policy.id),
                         direction: DismissDirection.endToStart,
@@ -161,8 +162,19 @@ class PolicyListScreen extends ConsumerWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const SizedBox(height: 4),
+                                if (policy.originalFileName != null && policy.originalFileName!.isNotEmpty)
+                                  Text(
+                                    policy.originalFileName!,
+                                    style: const TextStyle(fontSize: 13, color: Colors.grey),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                const SizedBox(height: 2),
                                 if (policy.createdAt != null)
-                                  Text('Uploaded: ${DateFormat("MMM d, yyyy • hh:mm a").format(policy.createdAt!.toLocal())}'),
+                                  Text(
+                                    DateFormat("dd-MM-yyyy hh:mm a").format(policy.createdAt!.toLocal()),
+                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                  ),
                               ],
                             ),
                             trailing: Row(
@@ -193,7 +205,7 @@ class PolicyListScreen extends ConsumerWidget {
                             ),
                             onTap: () {
                               if (policy.gridFsFileId != null) {
-                                context.push('/view-pdf/${policy.gridFsFileId}?title=Policy%20${policy.sequenceNumber ?? ''}');
+                                context.push('/view-pdf/${policy.gridFsFileId}?title=${policy.displayId}');
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(content: Text('No PDF document attached to this policy.')),

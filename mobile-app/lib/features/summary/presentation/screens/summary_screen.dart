@@ -67,7 +67,8 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
           }
 
         final data = snapshot.data ?? {};
-        final confidenceScore = data['confidenceScore'] ?? 0;
+        final dominanceScore = data['dominanceScore'] ?? 0;
+        final coverageBreakdown = data['coverageBreakdown'] as Map<String, dynamic>? ?? {};
         final overallStatus = data['overallStatus'] ?? 'Unknown';
         final summaryText = data['summaryText'] ?? 'No summary available.';
         final comparison = data['comparison'] as List<dynamic>? ?? [];
@@ -183,13 +184,44 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          '$confidenceScore% Confidence Score',
+                          '$dominanceScore% Dominance Score',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
                             color: statusColor,
                           ),
                         ),
+                        if (coverageBreakdown.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.black.withAlpha(20) : Colors.white.withAlpha(150),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  'Coverage Breakdown',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    _buildBreakdownStat('Covered', coverageBreakdown['covered'] ?? 0, successGreen),
+                                    _buildBreakdownStat('Partial', coverageBreakdown['partiallyCovered'] ?? 0, warningAmber),
+                                    _buildBreakdownStat('Not Covered', coverageBreakdown['notCovered'] ?? 0, dangerRed),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 20),
                         Text(
                           summaryText,
@@ -596,6 +628,31 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
         );
       },
       ),
+    );
+  }
+
+  // ─── Helper: Breakdown Stat ───
+  Widget _buildBreakdownStat(String label, int count, Color color) {
+    return Column(
+      children: [
+        Text(
+          count.toString(),
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: color,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: color.withAlpha(200),
+          ),
+        ),
+      ],
     );
   }
 

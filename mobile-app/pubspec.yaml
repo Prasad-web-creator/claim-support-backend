@@ -47,6 +47,7 @@ dependencies:
   intl: ^0.20.3
   flutter_dotenv: ^6.0.1
   flutter_secure_storage: ^10.3.1
+  syncfusion_flutter_pdfviewer: ^33.2.13
 
 dev_dependencies:
   integration_test:

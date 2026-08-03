@@ -258,8 +258,9 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen>
                             final prefs = SharedPrefs.instance;
                             final prescriptionPath = prefs.getString('prescription_path');
                             final policyPath = prefs.getString('policy_path');
-                            if (prescriptionPath != null && policyPath != null) {
-                               ref.invalidate(analysisJobProvider(AnalysisParams(prescriptionPath, policyPath)));
+                            final policyId = policyPath != null ? null : prefs.getString('policy_id');
+                            if (prescriptionPath != null && (policyPath != null || policyId != null)) {
+                               ref.invalidate(analysisJobProvider(AnalysisParams(prescriptionPath: prescriptionPath, policyPath: policyPath, policyId: policyId)));
                             }
                           },
                           style: ElevatedButton.styleFrom(
@@ -315,14 +316,15 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen>
     final prefs = SharedPrefs.instance;
     final prescriptionPath = prefs.getString('prescription_path');
     final policyPath = prefs.getString('policy_path');
+    final policyId = policyPath != null ? null : prefs.getString('policy_id');
 
-    if (prescriptionPath == null || policyPath == null) {
+    if (prescriptionPath == null || (policyPath == null && policyId == null)) {
       return Scaffold(
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text("Missing uploaded files."),
+              const Text("Missing uploaded files or policy selection."),
               TextButton(
                 onPressed: () => context.go('/dashboard'),
                 child: const Text("Return to Dashboard"),
@@ -333,7 +335,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen>
       );
     }
 
-    final params = AnalysisParams(prescriptionPath, policyPath);
+    final params = AnalysisParams(prescriptionPath: prescriptionPath, policyPath: policyPath, policyId: policyId);
     final analysisState = ref.watch(analysisJobProvider(params));
 
     // Handle state mapping outside of build return

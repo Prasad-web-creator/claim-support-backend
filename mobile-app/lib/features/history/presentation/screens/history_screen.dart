@@ -92,10 +92,10 @@ class HistoryScreen extends ConsumerWidget {
                               ? DateFormat.yMMMd().format(report.createdAt!)
                               : 'Unknown Date';
 
-                          final confidence = report.confidenceScore != null
-                              ? '${report.confidenceScore}% Confidence'
+                          final dominance = report.dominanceScore != null
+                              ? '${report.dominanceScore}% Dominance Score'
                               : '';
-                          final subtitleText = '${report.overallStatus ?? "Pending"}${confidence.isNotEmpty ? ' - $confidence' : ''}\n$dateStr';
+                          final subtitleText = '${report.overallStatus ?? "Pending"}${dominance.isNotEmpty ? ' - $dominance' : ''}\n$dateStr';
 
                           return Dismissible(
                             key: ValueKey(report.id),

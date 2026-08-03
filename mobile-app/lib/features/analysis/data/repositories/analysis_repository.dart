@@ -5,14 +5,17 @@ import 'package:claimsupport/core/exceptions/app_exception.dart';
 class AnalysisRepository {
   final Dio _dio = ApiClient().dio;
 
-  Future<Map<String, dynamic>> startAnalysis(String prescriptionPath, String policyPath, CancelToken cancelToken) async {
+  Future<Map<String, dynamic>> startAnalysis(String prescriptionPath, {String? policyPath, String? policyId, required CancelToken cancelToken}) async {
     try {
+      final Map<String, dynamic> requestData = {
+        'prescriptionPath': prescriptionPath,
+      };
+      if (policyPath != null) requestData['policyPath'] = policyPath;
+      if (policyId != null) requestData['policyId'] = policyId;
+
       final response = await _dio.post(
         '/analysis/start',
-        data: {
-          'prescriptionPath': prescriptionPath,
-          'policyPath': policyPath,
-        },
+        data: requestData,
         cancelToken: cancelToken,
       );
       

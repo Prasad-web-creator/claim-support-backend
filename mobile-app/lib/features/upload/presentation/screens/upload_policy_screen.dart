@@ -48,9 +48,10 @@ class _UploadPolicyScreenState extends State<UploadPolicyScreen> {
           _uploadedPath = response.data['fileId'].toString();
           final prefs = SharedPrefs.instance;
           await prefs.setString('policy_path', _uploadedPath!);
+          await prefs.remove('policy_id'); // Ensure old policy_id is cleared
           
           try {
-            await ApiClient().dio.post('/policies', data: {
+            final policyResponse = await ApiClient().dio.post('/policies', data: {
               'insuranceCompany': _companyController.text,
               'policyNumber': '',
               'policyName': 'Uploaded Policy',
@@ -63,6 +64,11 @@ class _UploadPolicyScreenState extends State<UploadPolicyScreen> {
                 'platform': 'Android',
               }
             });
+            
+            final prefs = SharedPrefs.instance;
+            final newPolicyId = policyResponse.data['_id'] ?? policyResponse.data['id'];
+            await prefs.setString('policy_id', newPolicyId.toString());
+            await prefs.remove('policy_path');
             
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Upload successful')));

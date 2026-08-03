@@ -5,7 +5,8 @@ class AnalysisReport {
   final String? content;
   final String? relatedFileId; // e.g. the policy or report that was analyzed
   final String? relatedModel; // 'Policy', 'Prescription', 'MedicalReport', 'MedicalBill'
-  final int? confidenceScore;
+  final double? dominanceScore;
+  final Map<String, dynamic>? coverageBreakdown;
   final String? overallStatus;
   final String? summaryText;
   final int? reportNumber;
@@ -19,7 +20,8 @@ class AnalysisReport {
     this.content,
     this.relatedFileId,
     this.relatedModel,
-    this.confidenceScore,
+    this.dominanceScore,
+    this.coverageBreakdown,
     this.overallStatus,
     this.summaryText,
     this.reportNumber,
@@ -35,7 +37,8 @@ class AnalysisReport {
       content: json['content'],
       relatedFileId: json['relatedFileId'],
       relatedModel: json['relatedModel'],
-      confidenceScore: (json['confidenceScore'] as num?)?.toInt(),
+      dominanceScore: (json['dominanceScore'] as num?)?.toDouble(),
+      coverageBreakdown: json['coverageBreakdown'] as Map<String, dynamic>?,
       overallStatus: json['overallStatus'],
       summaryText: json['summaryText'],
       reportNumber: (json['reportNumber'] as num?)?.toInt(),
@@ -51,7 +54,8 @@ class AnalysisReport {
       'content': content,
       'relatedFileId': relatedFileId,
       'relatedModel': relatedModel,
-      'confidenceScore': confidenceScore,
+      'dominanceScore': dominanceScore,
+      'coverageBreakdown': coverageBreakdown,
       'overallStatus': overallStatus,
       'summaryText': summaryText,
     };

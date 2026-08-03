@@ -121,7 +121,18 @@ class _UploadPrescriptionScreenState extends ConsumerState<UploadPrescriptionScr
       _isExtracting = true;
     });
 
-    await Future.delayed(const Duration(milliseconds: 1500));
+    List<dynamic> policiesList = [];
+    bool hasPolicies = false;
+    
+    try {
+      final response = await ApiClient().dio.get('/policies/summary');
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        policiesList = response.data['policies'];
+        hasPolicies = policiesList.isNotEmpty;
+      }
+    } catch (e) {
+      debugPrint("Failed to fetch policies: $e");
+    }
 
     if (!mounted) return;
 
@@ -129,51 +140,119 @@ class _UploadPrescriptionScreenState extends ConsumerState<UploadPrescriptionScr
       _isExtracting = false;
     });
 
-    final hasPolicies = (ref.read(dashboardStatsProvider).value?.totalPolicies ?? 0) > 0;
-
     if (!hasPolicies) {
       context.push('/upload-policy');
       return;
     }
 
     showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext dialogContext) {
-          final isDark = Theme.of(context).brightness == Brightness.dark;
-          return AlertDialog(
-            title: const Text("Existing Policy Found", style: TextStyle(fontWeight: FontWeight.bold)),
-            content: const Text(
-              "We found an active policy for this prescription. Would you like to use this existing policy for the coverage analysis, or upload a new one?",
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return AlertDialog(
+          title: const Text("Existing Policy Found", style: TextStyle(fontWeight: FontWeight.bold)),
+          content: const Text(
+            "We found existing policies in your account. Would you like to analyze this prescription using one of your saved policies?",
+          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                context.push('/upload-policy');
+              },
+              child: Text(
+                "Upload New Policy",
+                style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade700),
+              ),
             ),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(dialogContext).pop();
-                  context.push('/upload-policy');
-                },
-                child: Text(
-                  "Upload New Policy",
-                  style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade700),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                _showPolicySelectionDialog(policiesList);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text("Continue Existing Policy"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showPolicySelectionDialog(List<dynamic> policies) {
+    String? localSelectedPolicyId;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text("Select Policy", style: TextStyle(fontWeight: FontWeight.bold)),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: policies.length,
+                  separatorBuilder: (context, index) => Divider(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
+                  itemBuilder: (context, index) {
+                    final p = policies[index];
+                    final isSelected = localSelectedPolicyId == p['id'];
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text("${p['providerName']} - ${p['policyType']}", style: const TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 4),
+                          Text("No: ${p['displayId'] ?? p['policyNumber']}"),
+                          if (p['expiryDate'] != null) Text("Expiry: ${p['expiryDate']}"),
+                          if (p['originalFileName'] != null) Text("File: ${p['originalFileName']}", style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, fontSize: 12)),
+                        ],
+                      ),
+                      trailing: isSelected ? const Icon(Icons.check_circle, color: Color(0xFF2563EB)) : const Icon(Icons.circle_outlined),
+                      onTap: () {
+                        setDialogState(() {
+                          localSelectedPolicyId = p['id'];
+                        });
+                      },
+                    );
+                  },
                 ),
               ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(dialogContext).pop();
-                  context.push('/analysis');
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2563EB),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text("Cancel", style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade700)),
                 ),
-                child: const Text("Continue Existing Policy"),
-              ),
-            ],
-          );
-        },
-      );
+                ElevatedButton(
+                  onPressed: localSelectedPolicyId == null ? null : () async {
+                    Navigator.of(context).pop();
+                    final prefs = SharedPrefs.instance;
+                    await prefs.setString('policy_id', localSelectedPolicyId!);
+                    await prefs.remove('policy_path'); // Ensure policy_path is cleared
+                    if (mounted) context.push('/analysis');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text("Analyze With Selected Policy"),
+                ),
+              ],
+            );
+          }
+        );
+      }
+    );
   }
 
   @override

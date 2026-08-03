@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:printing/printing.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:dio/dio.dart';
 import 'package:claimsupport/core/network/api_client.dart';
 import 'package:go_router/go_router.dart';
@@ -81,15 +81,10 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
                     ),
                   ),
                 )
-              : PdfPreview(
-                  build: (format) => _pdfBytes!,
-                  allowPrinting: false,
-                  allowSharing: false,
-                  canChangeOrientation: false,
-                  canChangePageFormat: false,
-                  canDebug: false,
-                  padding: EdgeInsets.zero,
-                  pdfFileName: '${widget.title}.pdf',
+              : SfPdfViewer.memory(
+                  _pdfBytes!,
+                  canShowScrollHead: false,
+                  canShowScrollStatus: true,
                 ),
     );
   }

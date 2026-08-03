@@ -16,6 +16,13 @@ class Policy {
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
+  String get displayId {
+    if (sequenceNumber != null) {
+      return 'PCY${sequenceNumber.toString().padLeft(4, '0')}';
+    }
+    return id.substring(0, 8).toUpperCase();
+  }
+
   Policy({
     required this.id,
     required this.policyNumber,

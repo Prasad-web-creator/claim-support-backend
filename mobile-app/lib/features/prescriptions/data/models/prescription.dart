@@ -12,6 +12,13 @@ class Prescription {
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
+  String get displayId {
+    if (sequenceNumber != null) {
+      return 'PSCT${sequenceNumber.toString().padLeft(4, '0')}';
+    }
+    return id.substring(0, 8).toUpperCase();
+  }
+
   Prescription({
     required this.id,
     required this.hospitalName,
