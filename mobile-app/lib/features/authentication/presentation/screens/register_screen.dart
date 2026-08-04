@@ -61,7 +61,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           'otp': _otpController.text,
         });
 
-        if (response.statusCode == 201) {
+        if (response.statusCode == 200 || response.statusCode == 201) {
           final token = response.data['token'];
           await AuthStorage.saveToken(token);
           ref.invalidate(authProvider);
