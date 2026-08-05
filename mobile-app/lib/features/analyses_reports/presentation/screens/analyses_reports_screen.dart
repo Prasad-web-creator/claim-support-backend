@@ -5,8 +5,8 @@ import 'package:claimsupport/core/theme/app_theme.dart';
 import 'package:intl/intl.dart';
 import 'package:claimsupport/features/analysis_reports/presentation/controllers/analysis_report_controller.dart';
 
-class HistoryScreen extends ConsumerWidget {
-  const HistoryScreen({super.key});
+class AnalysesReportsScreen extends ConsumerWidget {
+  const AnalysesReportsScreen({super.key});
 
   Future<void> _confirmDelete(BuildContext context, WidgetRef ref, String id, String label) async {
     final confirmed = await showDialog<bool>(
@@ -85,17 +85,31 @@ class HistoryScreen extends ConsumerWidget {
                           }
 
                           final report = reports[index];
-                          final label = report.reportNumber != null
-                              ? 'Analyze Report ${report.reportNumber}'
-                              : report.title;
-                          final dateStr = report.createdAt != null
-                              ? DateFormat.yMMMd().format(report.createdAt!)
-                              : 'Unknown Date';
+                          final reportNumber = report.reportNumber != null ? 'AN${report.reportNumber!.toString().padLeft(4, '0')}' : 'Unknown';
+                          final policyName = report.policyMetadata?['plan_name'] ?? report.policyMetadata?['policy_type'] ?? report.policyMetadata?['insurance_company'] ?? 'Unknown Policy';
+                          final patientName = report.prescriptionMetadata?['patient_name'] ?? 'Unknown Patient';
+                          final status = report.overallStatus ?? 'Pending';
+                          
+                          Color statusColor = Colors.grey;
+                          if (status.toLowerCase().contains('partially')) {
+                            statusColor = Colors.orange;
+                          } else if (status.toLowerCase().contains('not')) {
+                            statusColor = Colors.red;
+                          } else if (status.toLowerCase().contains('covered')) {
+                            statusColor = Colors.green;
+                          }
 
                           final dominance = report.dominanceScore != null
-                              ? '${report.dominanceScore}% Dominance Score'
-                              : '';
-                          final subtitleText = '${report.overallStatus ?? "Pending"}${dominance.isNotEmpty ? ' - $dominance' : ''}\n$dateStr';
+                              ? '${report.dominanceScore}%'
+                              : 'N/A';
+
+                          final dateStr = report.createdAt != null
+                              ? DateFormat('dd-MM-yyyy h:mm a').format(report.createdAt!.toLocal())
+                              : 'Unknown Date';
+                              
+                          final analyzedTime = report.processingTimeMs != null 
+                              ? '${(report.processingTimeMs! / 1000).toStringAsFixed(1)}s'
+                              : 'N/A';
 
                           return Dismissible(
                             key: ValueKey(report.id),
@@ -123,7 +137,7 @@ class HistoryScreen extends ConsumerWidget {
                                 builder: (ctx) => AlertDialog(
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                                   title: const Text('Delete Report', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  content: Text('Are you sure you want to delete "$label"? This action cannot be undone.'),
+                                  content: Text('Are you sure you want to delete "Report $reportNumber"? This action cannot be undone.'),
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.of(ctx).pop(false),
@@ -158,33 +172,58 @@ class HistoryScreen extends ConsumerWidget {
                               return false;
                             },
                             child: Card(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
-                                  child: const Icon(Icons.analytics, color: AppTheme.primaryColor),
-                                ),
-                                title: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-                                subtitle: Text(subtitleText),
-                                isThreeLine: true,
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
+                            elevation: 0,
+                            margin: const EdgeInsets.only(bottom: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: BorderSide(color: Colors.grey.withOpacity(0.2)),
+                            ),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(16),
+                              onTap: () => context.push('/summary/${report.id}'),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.delete_outline, color: Colors.red),
-                                      tooltip: 'Delete',
-                                      onPressed: () => _confirmDelete(context, ref, report.id!, label),
+                                    Row(
+                                      children: [
+                                        Text(reportNumber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                        const Spacer(),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: statusColor.withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(20),
+                                            border: Border.all(color: statusColor.withOpacity(0.5)),
+                                          ),
+                                          child: Text(
+                                            status,
+                                            style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        IconButton(
+                                          icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 22),
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(),
+                                          onPressed: () => _confirmDelete(context, ref, report.id!, reportNumber),
+                                        ),
+                                      ],
                                     ),
-                                    const Icon(Icons.chevron_right),
+                                    const SizedBox(height: 8),
+                                    _buildTextRow('Policy Name', policyName),
+                                    _buildTextRow('Patient Name', patientName),
+                                    _buildTextRow('Dominance score', dominance),
+                                    _buildTextRow('Analyzed DateTime', dateStr),
+                                    _buildTextRow('Analyzed time', analyzedTime),
                                   ],
                                 ),
-                                onTap: () {
-                                  context.push('/summary/${report.id}');
-                                },
                               ),
                             ),
-                          );
-                        },
+                          ),
+                        );
+                      },
                       ),
                     );
                   },
@@ -196,6 +235,23 @@ class HistoryScreen extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildTextRow(String? label, String value, {Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6.0),
+      child: label == null 
+        ? Text(value, style: TextStyle(color: color, fontSize: 14, fontWeight: color != null ? FontWeight.bold : FontWeight.normal))
+        : RichText(
+            text: TextSpan(
+              style: const TextStyle(fontSize: 14, color: Colors.black87),
+              children: [
+                TextSpan(text: '$label : ', style: const TextStyle(fontWeight: FontWeight.w600)),
+                TextSpan(text: value, style: TextStyle(color: color)),
+              ],
+            ),
+          ),
     );
   }
 }

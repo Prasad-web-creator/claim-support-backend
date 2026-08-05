@@ -221,7 +221,7 @@ class DashboardScreen extends ConsumerWidget {
                                   child: const Text(
                                     'View All',
                                     style: TextStyle(
-                                      color: const Color(0xFF2563EB),
+                                      color: Color(0xFF2563EB),
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -378,7 +378,7 @@ class DashboardScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      report.reportNumber != null ? 'Analyze Report ${report.reportNumber}' : report.title,
+                      report.displayReportNumber,
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 15,
@@ -390,9 +390,9 @@ class DashboardScreen extends ConsumerWidget {
                     const SizedBox(height: 4),
                     if (report.createdAt != null)
                       Text(
-                        DateFormat.yMMMd().format(report.createdAt!),
+                        DateFormat('dd-MM-yyyy  hh:mm a').format(report.createdAt!.toLocal()),
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           color: isDark ? Colors.grey.shade400 : const Color(0xFF6B7280),
                         ),
                       ),

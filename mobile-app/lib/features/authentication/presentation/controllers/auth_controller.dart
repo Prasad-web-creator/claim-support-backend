@@ -17,4 +17,16 @@ class AuthNotifier extends AsyncNotifier<User?> {
     final user = await repository.getMe();
     return user;
   }
+
+  Future<void> updateProfile(String name, String email) async {
+    state = const AsyncLoading();
+    try {
+      final repository = ref.read(authRepositoryProvider);
+      final updatedUser = await repository.updateProfile(name, email);
+      state = AsyncData(updatedUser);
+    } catch (err, stack) {
+      state = AsyncError(err, stack);
+      rethrow;
+    }
+  }
 }

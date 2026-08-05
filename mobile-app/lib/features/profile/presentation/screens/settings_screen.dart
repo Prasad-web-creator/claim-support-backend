@@ -92,11 +92,41 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Profile updated successfully!')),
-                  );
-                  Navigator.pop(context);
+                onPressed: () async {
+                  final name = _nameController.text.trim();
+                  final email = _emailController.text.trim();
+
+                  if (name.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Name cannot be empty'), backgroundColor: Colors.red),
+                    );
+                    return;
+                  }
+
+                  // Basic email validation regex
+                  final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                  if (email.isEmpty || !emailRegex.hasMatch(email)) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please enter a valid email address'), backgroundColor: Colors.red),
+                    );
+                    return;
+                  }
+
+                  try {
+                    await ref.read(authProvider.notifier).updateProfile(name, email);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Profile updated successfully!'), backgroundColor: Colors.green),
+                      );
+                      Navigator.pop(context);
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to update profile: $e'), backgroundColor: Colors.red),
+                      );
+                    }
+                  }
                 },
                 child: const Text('Save Changes'),
               ),

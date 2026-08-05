@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:claimsupport/core/network/api_client.dart';
-import 'package:claimsupport/features/dashboard/presentation/controllers/dashboard_controller.dart';
 import 'package:claimsupport/core/utils/shared_prefs.dart';
 
 class UploadPrescriptionScreen extends ConsumerStatefulWidget {
@@ -16,16 +16,40 @@ class UploadPrescriptionScreen extends ConsumerStatefulWidget {
 }
 
 class _UploadPrescriptionScreenState extends ConsumerState<UploadPrescriptionScreen> {
-  final TextEditingController _hospitalController = TextEditingController();
   String? _selectedFileName;
   String? _uploadedPath;
   bool _isUploading = false;
   bool _isExtracting = false;
 
-  @override
-  void dispose() {
-    _hospitalController.dispose();
-    super.dispose();
+  String? _formatDisplayDate(dynamic dateVal) {
+    if (dateVal == null) return null;
+    final str = dateVal.toString().trim();
+    if (str.isEmpty || str.toLowerCase() == 'null') return null;
+
+    try {
+      final parsed = DateTime.tryParse(str);
+      if (parsed != null) {
+        return DateFormat('dd-MM-yyyy').format(parsed);
+      }
+      
+      final slashParts = str.split('/');
+      if (slashParts.length == 3) {
+        if (slashParts[0].length == 4) {
+          return "${slashParts[2].padLeft(2, '0')}-${slashParts[1].padLeft(2, '0')}-${slashParts[0]}";
+        }
+        return "${slashParts[0].padLeft(2, '0')}-${slashParts[1].padLeft(2, '0')}-${slashParts[2]}";
+      }
+
+      final dashParts = str.split('-');
+      if (dashParts.length == 3) {
+        if (dashParts[0].length == 4) {
+          return "${dashParts[2].padLeft(2, '0')}-${dashParts[1].padLeft(2, '0')}-${dashParts[0]}";
+        }
+        return "${dashParts[0].padLeft(2, '0')}-${dashParts[1].padLeft(2, '0')}-${dashParts[2]}";
+      }
+    } catch (_) {}
+
+    return str;
   }
 
   Future<void> _pickAndUploadFile() async {
@@ -54,7 +78,7 @@ class _UploadPrescriptionScreenState extends ConsumerState<UploadPrescriptionScr
           
           try {
             await ApiClient().dio.post('/prescriptions', data: {
-              'hospitalName': _hospitalController.text,
+              'hospitalName': '',
               'gridFsFileId': _uploadedPath,
               'originalFileName': _selectedFileName,
               'agreement': {
@@ -191,51 +215,188 @@ class _UploadPrescriptionScreenState extends ConsumerState<UploadPrescriptionScr
     showDialog(
       context: context,
       barrierDismissible: true,
-      builder: (BuildContext context) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
+      builder: (BuildContext dialogContext) {
+        final isDark = Theme.of(dialogContext).brightness == Brightness.dark;
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (dialogCtx, setDialogState) {
             return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               title: const Text("Select Policy", style: TextStyle(fontWeight: FontWeight.bold)),
               content: SizedBox(
                 width: double.maxFinite,
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: policies.length,
-                  separatorBuilder: (context, index) => Divider(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
+                  separatorBuilder: (context, index) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {
                     final p = policies[index];
                     final isSelected = localSelectedPolicyId == p['id'];
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text("${p['providerName']} - ${p['policyType']}", style: const TextStyle(fontWeight: FontWeight.w600)),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 4),
-                          Text("No: ${p['displayId'] ?? p['policyNumber']}"),
-                          if (p['expiryDate'] != null) Text("Expiry: ${p['expiryDate']}"),
-                          if (p['originalFileName'] != null) Text("File: ${p['originalFileName']}", style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, fontSize: 12)),
-                        ],
-                      ),
-                      trailing: isSelected ? const Icon(Icons.check_circle, color: Color(0xFF2563EB)) : const Icon(Icons.circle_outlined),
+                    
+                    final String provider = p['providerName'] ?? 'Insurance Policy';
+                    final String policyType = p['policyType'] ?? '';
+                    final String? holderName = p['policyHolderName'];
+                    final String? formattedStart = _formatDisplayDate(p['startDate']);
+                    final String? formattedEnd = _formatDisplayDate(p['endDate'] ?? p['expiryDate']);
+                    final String policyNo = p['displayId'] ?? p['policyNumber'] ?? 'Unknown';
+                    final String? fileName = p['originalFileName'];
+
+                    return InkWell(
                       onTap: () {
                         setDialogState(() {
                           localSelectedPolicyId = p['id'];
                         });
                       },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? (isDark ? const Color(0x4D1E3A8A) : const Color(0xFFEFF6FF))
+                              : (isDark ? Colors.grey.shade900 : Colors.grey.shade50),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected
+                                ? const Color(0xFF2563EB)
+                                : (isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+                            width: isSelected ? 1.5 : 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    policyType.isNotEmpty ? "$provider - $policyType" : provider,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  if (holderName != null && holderName.isNotEmpty) ...[
+                                    Row(
+                                      children: [
+                                        Icon(Icons.person_outline, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                        const SizedBox(width: 4),
+                                        Expanded(
+                                          child: Text(
+                                            "Holder: $holderName",
+                                            style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: isDark ? Colors.grey.shade300 : Colors.grey.shade800,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 3),
+                                  ],
+                                  Row(
+                                    children: [
+                                      Icon(Icons.tag, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        "No: $policyNo",
+                                        style: TextStyle(
+                                          fontSize: 12.5,
+                                          color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  if (formattedStart != null && formattedEnd != null) ...[
+                                    Row(
+                                      children: [
+                                        Icon(Icons.calendar_today_outlined, size: 13, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          "Validity: $formattedStart to $formattedEnd",
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 3),
+                                  ] else if (formattedStart != null) ...[
+                                    Row(
+                                      children: [
+                                        Icon(Icons.calendar_today_outlined, size: 13, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          "Start Date: $formattedStart",
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 3),
+                                  ] else if (formattedEnd != null) ...[
+                                    Row(
+                                      children: [
+                                        Icon(Icons.event_busy_outlined, size: 13, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          "Expiry: $formattedEnd",
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 3),
+                                  ],
+                                  if (fileName != null && fileName.isNotEmpty)
+                                    Row(
+                                      children: [
+                                        Icon(Icons.description_outlined, size: 13, color: isDark ? Colors.grey.shade500 : Colors.grey.shade500),
+                                        const SizedBox(width: 4),
+                                        Expanded(
+                                          child: Text(
+                                            "File: $fileName",
+                                            style: TextStyle(
+                                              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                              fontSize: 11,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: isSelected
+                                  ? const Icon(Icons.check_circle, color: Color(0xFF2563EB), size: 22)
+                                  : Icon(Icons.circle_outlined, color: isDark ? Colors.grey.shade600 : Colors.grey.shade400, size: 22),
+                            ),
+                          ],
+                        ),
+                      ),
                     );
                   },
                 ),
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () => Navigator.of(dialogContext).pop(),
                   child: Text("Cancel", style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade700)),
                 ),
                 ElevatedButton(
                   onPressed: localSelectedPolicyId == null ? null : () async {
-                    Navigator.of(context).pop();
+                    Navigator.of(dialogContext).pop();
                     final prefs = SharedPrefs.instance;
                     await prefs.setString('policy_id', localSelectedPolicyId!);
                     await prefs.remove('policy_path'); // Ensure policy_path is cleared
@@ -244,6 +405,7 @@ class _UploadPrescriptionScreenState extends ConsumerState<UploadPrescriptionScr
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2563EB),
                     foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   child: const Text("Analyze With Selected Policy"),
                 ),
@@ -397,59 +559,6 @@ class _UploadPrescriptionScreenState extends ConsumerState<UploadPrescriptionScr
                 ),
               ),
               const SizedBox(height: 32),
-              
-              // Hospital / Clinic Name Field
-              Text(
-                'Hospital / Clinic Name',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: textColor,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                decoration: BoxDecoration(
-                  color: theme.inputDecorationTheme.fillColor ?? (isDark ? Colors.grey.shade900 : Colors.white),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(10),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: TextField(
-                  controller: _hospitalController,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: textColor,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'e.g. City General Hospital',
-                    hintStyle: TextStyle(
-                      color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
-                    ),
-                    filled: true,
-                    fillColor: theme.inputDecorationTheme.fillColor ?? (isDark ? Colors.grey.shade900 : Colors.white),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: primaryBlue, width: 2),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 48),
               
               // Process Button
               Container(

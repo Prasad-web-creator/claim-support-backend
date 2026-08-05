@@ -14,16 +14,9 @@ class UploadPolicyScreen extends StatefulWidget {
 }
 
 class _UploadPolicyScreenState extends State<UploadPolicyScreen> {
-  final TextEditingController _companyController = TextEditingController();
   String? _selectedFileName;
   String? _uploadedPath;
   bool _isUploading = false;
-
-  @override
-  void dispose() {
-    _companyController.dispose();
-    super.dispose();
-  }
 
   Future<void> _pickAndUploadFile() async {
     FilePickerResult? result = await FilePicker.pickFiles(
@@ -52,7 +45,7 @@ class _UploadPolicyScreenState extends State<UploadPolicyScreen> {
           
           try {
             final policyResponse = await ApiClient().dio.post('/policies', data: {
-              'insuranceCompany': _companyController.text,
+              'insuranceCompany': '',
               'policyNumber': '',
               'policyName': 'Uploaded Policy',
               'gridFsFileId': _uploadedPath,
@@ -263,59 +256,6 @@ class _UploadPolicyScreenState extends State<UploadPolicyScreen> {
                 ),
               ),
               const SizedBox(height: 32),
-              
-              // Insurance Company Name Field
-              Text(
-                'Insurance Company (Optional - Auto-detected)',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: textColor,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                decoration: BoxDecoration(
-                  color: theme.inputDecorationTheme.fillColor ?? (isDark ? Colors.grey.shade900 : Colors.white),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(10),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: TextField(
-                  controller: _companyController,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: textColor,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'e.g. UnitedHealthcare, Cigna',
-                    hintStyle: TextStyle(
-                      color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
-                    ),
-                    filled: true,
-                    fillColor: theme.inputDecorationTheme.fillColor ?? (isDark ? Colors.grey.shade900 : Colors.white),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: primaryBlue, width: 2),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 48),
               
               // Analyze Documents Button
               Container(

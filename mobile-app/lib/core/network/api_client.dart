@@ -3,7 +3,6 @@ import 'auth_interceptor.dart';
 import 'package:flutter/foundation.dart';
 import 'retry_interceptor.dart';
 import '../config/env_config.dart';
-import '../exceptions/app_exception.dart'; // We'll create or use this if it exists, or just rewrite the error message
 
 class ApiClient {
   static final ApiClient _instance = ApiClient._internal();

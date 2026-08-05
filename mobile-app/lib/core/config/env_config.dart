@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 enum Environment {
   dev,
   prod,
@@ -9,18 +12,25 @@ class EnvConfig {
 
   static void initialize(Environment env) {
     _environment = env;
+    final envFileUrl = dotenv.env['API_BASE_URL'];
+
     switch (env) {
       case Environment.prod:
-        // In production, force HTTPS and use the production domain.
-        // We inject this securely via --dart-define during the build.
-        _apiBaseUrl = const String.fromEnvironment('API_BASE_URL', defaultValue: 'https://claim-support-backend-python-production.up.railway.app/api');
+        _apiBaseUrl = const String.fromEnvironment(
+          'API_BASE_URL',
+          defaultValue: 'https://claim-support-backend-python-production.up.railway.app/api',
+        );
         break;
       case Environment.dev:
-      default:
-        // In dev, we can use HTTP and local IPs.
-        _apiBaseUrl = const String.fromEnvironment('API_BASE_URL', defaultValue: 'https://claim-support-backend-python-production.up.railway.app/api');
+        _apiBaseUrl = (envFileUrl != null && envFileUrl.isNotEmpty)
+            ? envFileUrl
+            : const String.fromEnvironment(
+                'API_BASE_URL',
+                defaultValue: 'http://10.71.14.1:8000/api',
+              );
         break;
     }
+    debugPrint('[EnvConfig] Initialized in $env mode with Base URL: $_apiBaseUrl');
   }
 
   static String get apiBaseUrl => _apiBaseUrl;

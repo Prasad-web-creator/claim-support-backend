@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:claimsupport/core/utils/auth_storage.dart';
 class AuthInterceptor extends Interceptor {
   @override

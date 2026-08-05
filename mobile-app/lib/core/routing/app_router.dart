@@ -10,7 +10,8 @@ import 'package:claimsupport/features/upload/presentation/screens/upload_policy_
 import 'package:claimsupport/features/analysis/presentation/screens/consent_screen.dart';
 import 'package:claimsupport/features/analysis/presentation/screens/analysis_screen.dart';
 import 'package:claimsupport/features/summary/presentation/screens/summary_screen.dart';
-import 'package:claimsupport/features/history/presentation/screens/history_screen.dart';
+import 'package:claimsupport/features/assistant/presentation/screens/assistant_screen.dart';
+import 'package:claimsupport/features/analyses_reports/presentation/screens/analyses_reports_screen.dart';
 import 'package:claimsupport/features/profile/presentation/screens/profile_screen.dart';
 import 'package:claimsupport/features/policies/presentation/screens/policy_list_screen.dart';
 import 'package:claimsupport/features/prescriptions/presentation/screens/prescription_list_screen.dart';
@@ -107,10 +108,10 @@ class AppRouter {
                   ),
                   const SizedBox(width: 48), // Space for FAB
                   _NavBarItem(
-                    icon: Icons.history,
-                    activeIcon: Icons.history,
-                    label: 'History',
-                    isSelected: _calculateSelectedIndex(state.uri.path) == 2, // Was 2 (upload), now history is 2
+                    icon: Icons.auto_awesome_outlined,
+                    activeIcon: Icons.auto_awesome,
+                    label: 'Assistant',
+                    isSelected: _calculateSelectedIndex(state.uri.path) == 2,
                     isDark: isDark,
                     onTap: () => _onItemTapped(2, context),
                   ),
@@ -134,7 +135,11 @@ class AppRouter {
           ),
           GoRoute(
             path: '/reports',
-            builder: (context, state) => const HistoryScreen(),
+            builder: (context, state) => const AnalysesReportsScreen(),
+          ),
+          GoRoute(
+            path: '/assistant',
+            builder: (context, state) => const AssistantScreen(),
           ),
           GoRoute(
             path: '/upload',
@@ -209,7 +214,7 @@ class AppRouter {
   static int _calculateSelectedIndex(String location) {
     if (location.startsWith('/dashboard')) return 0;
     if (location.startsWith('/reports')) return 1;
-    if (location.startsWith('/activity-logs')) return 2;
+    if (location.startsWith('/assistant')) return 2;
     if (location.startsWith('/profile')) return 3;
     return 0;
   }
@@ -223,7 +228,7 @@ class AppRouter {
         context.go('/reports');
         break;
       case 2:
-        context.go('/activity-logs');
+        context.go('/assistant');
         break;
       case 3:
         context.go('/profile');

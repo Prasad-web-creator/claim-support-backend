@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:claimsupport/features/policies/data/models/policy.dart';
 import 'package:claimsupport/features/policies/presentation/controllers/policy_controller.dart';
 import 'package:intl/intl.dart';
 
@@ -130,7 +129,7 @@ class PolicyListScreen extends ConsumerWidget {
                           );
                           if (confirmed == true) {
                             try {
-                              await ref.read(policiesProvider.notifier).deletePolicy(policy.id!);
+                              await ref.read(policiesProvider.notifier).deletePolicy(policy.id);
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(content: Text('Policy deleted successfully.'), backgroundColor: Colors.green),
@@ -150,59 +149,17 @@ class PolicyListScreen extends ConsumerWidget {
                         },
                         child: Card(
                           margin: const EdgeInsets.only(bottom: 16),
-                          color: theme.cardTheme.color ?? theme.cardColor,
+                          elevation: isDark ? 0 : 1,
+                          color: isDark ? const Color(0xFF1E2230) : Colors.white,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(color: isDark ? Colors.grey.shade800 : Colors.transparent),
+                            borderRadius: BorderRadius.circular(16),
+                            side: BorderSide(
+                              color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+                              width: 1,
+                            ),
                           ),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.all(16),
-                            title: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 4),
-                                if (policy.originalFileName != null && policy.originalFileName!.isNotEmpty)
-                                  Text(
-                                    policy.originalFileName!,
-                                    style: const TextStyle(fontSize: 13, color: Colors.grey),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                const SizedBox(height: 2),
-                                if (policy.createdAt != null)
-                                  Text(
-                                    DateFormat("dd-MM-yyyy hh:mm a").format(policy.createdAt!.toLocal()),
-                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                  ),
-                              ],
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: policy.status == 'Active' ? Colors.green.withAlpha(20) : Colors.red.withAlpha(20),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    policy.status,
-                                    style: TextStyle(
-                                      color: policy.status == 'Active' ? Colors.green : Colors.red,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                IconButton(
-                                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-                                  tooltip: 'Delete',
-                                  onPressed: () => _confirmDelete(context, ref, policy.id!, label),
-                                ),
-                              ],
-                            ),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
                             onTap: () {
                               if (policy.gridFsFileId != null) {
                                 context.push('/view-pdf/${policy.gridFsFileId}?title=${policy.displayId}');
@@ -212,6 +169,237 @@ class PolicyListScreen extends ConsumerWidget {
                                 );
                               }
                             },
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Builder(
+                                builder: (context) {
+                                  final policyDisplayName = policy.policyName.trim().isNotEmpty && policy.policyName != 'Uploaded Policy'
+                                      ? policy.policyName
+                                      : (policy.insuranceCompany.trim().isNotEmpty
+                                          ? (policy.policyType != null && policy.policyType!.isNotEmpty
+                                              ? "${policy.insuranceCompany} - ${policy.policyType}"
+                                              : policy.insuranceCompany)
+                                          : (policy.originalFileName ?? 'Insurance Policy'));
+
+                                  final formattedStart = policy.policyStartDate != null
+                                      ? DateFormat('dd-MM-yyyy').format(policy.policyStartDate!.toLocal())
+                                      : null;
+                                  final formattedEnd = policy.policyEndDate != null
+                                      ? DateFormat('dd-MM-yyyy').format(policy.policyEndDate!.toLocal())
+                                      : null;
+
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      // Top Header: PCY ID + Status + Delete Action
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: isDark ? const Color(0xFF1E3A8A).withAlpha(80) : const Color(0xFFEFF6FF),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: isDark ? const Color(0xFF3B82F6).withAlpha(80) : const Color(0xFFBFDBFE),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              policy.displayId,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                                color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
+                                              ),
+                                            ),
+                                          ),
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: policy.status == 'Active'
+                                                      ? (isDark ? Colors.green.shade900.withAlpha(80) : const Color(0xFFDCFCE7))
+                                                      : (isDark ? Colors.red.shade900.withAlpha(80) : const Color(0xFFFEE2E2)),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                child: Text(
+                                                  policy.status,
+                                                  style: TextStyle(
+                                                    color: policy.status == 'Active'
+                                                        ? (isDark ? Colors.green.shade300 : const Color(0xFF15803D))
+                                                        : (isDark ? Colors.red.shade300 : const Color(0xFFB91C1C)),
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              IconButton(
+                                                icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                                                tooltip: 'Delete',
+                                                visualDensity: VisualDensity.compact,
+                                                padding: EdgeInsets.zero,
+                                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                                onPressed: () => _confirmDelete(context, ref, policy.id, label),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 10),
+
+                                      // Policy Name
+                                      Text(
+                                        policyDisplayName,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15.5,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+
+                                      // Policy Holder Name
+                                      if (policy.policyHolderName != null && policy.policyHolderName!.trim().isNotEmpty) ...[
+                                        Row(
+                                          children: [
+                                            Icon(Icons.person_outline, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                "Holder: ${policy.policyHolderName}",
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: isDark ? Colors.grey.shade300 : Colors.grey.shade800,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                      ],
+
+                                      // Policy Number
+                                      if (policy.policyNumber.trim().isNotEmpty) ...[
+                                        Row(
+                                          children: [
+                                            Icon(Icons.tag, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                "Policy No: ${policy.policyNumber}",
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                      ],
+
+                                      // Policy Start & End Date
+                                      if (formattedStart != null && formattedEnd != null) ...[
+                                        Row(
+                                          children: [
+                                            Icon(Icons.calendar_today_outlined, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                "Validity: $formattedStart to $formattedEnd",
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                      ] else if (formattedStart != null) ...[
+                                        Row(
+                                          children: [
+                                            Icon(Icons.calendar_today_outlined, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                "Start Date: $formattedStart",
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                      ] else if (formattedEnd != null) ...[
+                                        Row(
+                                          children: [
+                                            Icon(Icons.event_busy_outlined, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                "Expiry: $formattedEnd",
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                      ],
+
+                                      // Policy File Name
+                                      if (policy.originalFileName != null && policy.originalFileName!.trim().isNotEmpty) ...[
+                                        Row(
+                                          children: [
+                                            Icon(Icons.insert_drive_file_outlined, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                "File: ${policy.originalFileName}",
+                                                style: TextStyle(
+                                                  fontSize: 12.5,
+                                                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                      ],
+
+                                      // Policy Uploaded Date with Time (12-hour AM/PM)
+                                      if (policy.createdAt != null) ...[
+                                        Row(
+                                          children: [
+                                            Icon(Icons.access_time, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                "Uploaded: ${DateFormat('dd-MM-yyyy hh:mm a').format(policy.createdAt!.toLocal())}",
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ],
+                                  );
+                                },
+                              ),
+                            ),
                           ),
                         ),
                       );

@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:claimsupport/core/network/api_client.dart';
 import 'package:claimsupport/core/utils/shared_prefs.dart';
+import 'package:claimsupport/features/summary/presentation/widgets/coverage_donut_chart.dart';
+import 'package:claimsupport/features/summary/services/coverage_report_pdf_service.dart';
 
 class SummaryScreen extends ConsumerStatefulWidget {
   final String? reportId;
@@ -15,6 +17,7 @@ class SummaryScreen extends ConsumerStatefulWidget {
 
 class _SummaryScreenState extends ConsumerState<SummaryScreen> {
   late Future<Map<String, dynamic>> _dataFuture;
+  bool _isGeneratingPdf = false;
 
   @override
   void initState() {
@@ -100,6 +103,40 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
 
         final bool isInvalid = overallStatus.startsWith('Invalid');
 
+        // Document & validation statuses
+        final docValidity = data['documentValidity'] as Map<String, dynamic>?;
+        bool isPolicyValid = true;
+        bool isPrescriptionValid = true;
+
+        if (docValidity != null) {
+          if (docValidity['policyValid'] == false || docValidity['isPolicyValid'] == false) {
+            isPolicyValid = false;
+          }
+          if (docValidity['prescriptionValid'] == false || docValidity['isPrescriptionValid'] == false) {
+            isPrescriptionValid = false;
+          }
+        }
+
+        final policyStatusVal = (data['policyStatus'] ?? data['policyValidationStatus'] ?? '').toString().toLowerCase();
+        if (policyStatusVal == 'invalid') {
+          isPolicyValid = false;
+        }
+
+        final rxStatusVal = (data['prescriptionStatus'] ?? data['prescriptionValidationStatus'] ?? '').toString().toLowerCase();
+        if (rxStatusVal == 'invalid') {
+          isPrescriptionValid = false;
+        }
+
+        final lowerOverall = overallStatus.toLowerCase();
+        if (lowerOverall.startsWith('invalid policy')) {
+          isPolicyValid = false;
+        } else if (lowerOverall.startsWith('invalid prescription')) {
+          isPrescriptionValid = false;
+        } else if (lowerOverall.startsWith('invalid')) {
+          isPolicyValid = false;
+          isPrescriptionValid = false;
+        }
+
         return Scaffold(
           backgroundColor: theme.scaffoldBackgroundColor,
           body: SafeArea(
@@ -117,36 +154,69 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                         child: Icon(Icons.cancel_outlined,
                             color: textColor, size: 28),
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'Coverage Summary',
                           style: TextStyle(
                             color: textColor,
-                            fontSize: 22,
+                            fontSize: 20,
                             fontWeight: FontWeight.w800,
                             letterSpacing: -0.5,
                           ),
                         ),
                       ),
-                      // Processing time badge
-                      if (processingTime > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: primaryBlue.withAlpha(15),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '${(processingTime / 1000).toStringAsFixed(1)}s',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: primaryBlue,
-                            ),
-                          ),
-                        ),
+                      // Download PDF Button (Only when analysis and validations are valid)
+                      if (!isInvalid && isPolicyValid && isPrescriptionValid) ...[
+                        const SizedBox(width: 8),
+                        _isGeneratingPdf
+                            ? Container(
+                                padding: const EdgeInsets.all(8),
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(primaryBlue),
+                                  ),
+                                ),
+                              )
+                            : Tooltip(
+                                message: 'Download PDF Report',
+                                child: InkWell(
+                                  onTap: () async {
+                                    setState(() => _isGeneratingPdf = true);
+                                    try {
+                                      await CoverageReportPdfService.generateAndSharePdf(context, data);
+                                    } finally {
+                                      if (mounted) {
+                                        setState(() => _isGeneratingPdf = false);
+                                      }
+                                    }
+                                  },
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: primaryBlue,
+                                      borderRadius: BorderRadius.circular(10),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: primaryBlue.withAlpha(50),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.download_rounded,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -159,19 +229,56 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(color: statusBorder),
                     ),
-                    child: Column(
+                    child: Stack(
                       children: [
-                        Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            color: statusColor.withAlpha(25),
-                            shape: BoxShape.circle,
+                        if (processingTime > 0)
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? Colors.black.withAlpha(50)
+                                    : Colors.white.withAlpha(200),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: statusColor.withAlpha(50),
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.timer_outlined,
+                                      size: 12, color: statusColor),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${(processingTime / 1000).toStringAsFixed(1)}s',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: statusColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                          child: Center(
-                            child: Icon(statusIcon, color: statusColor, size: 32),
-                          ),
-                        ),
+                        Column(
+                          children: [
+                            Container(
+                              width: 64,
+                              height: 64,
+                              decoration: BoxDecoration(
+                                color: statusColor.withAlpha(25),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Icon(statusIcon, color: statusColor, size: 32),
+                              ),
+                            ),
                         const SizedBox(height: 20),
                         Text(
                           overallStatus,
@@ -234,7 +341,9 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                         ),
                       ],
                     ),
-                  ),
+                  ],
+                ),
+              ),
                   const SizedBox(height: 24),
 
                   if (!isInvalid) ...[
@@ -288,6 +397,12 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                     ),
                   const SizedBox(height: 24),
 
+                  // ─── Coverage Distribution Donut Chart ───
+                  CoverageDonutChart(
+                    coverageBreakdown: coverageBreakdown,
+                    isPolicyValid: isPolicyValid,
+                    isPrescriptionValid: isPrescriptionValid,
+                  ),
 
                   // ─── Comparison Table ───
                   if (comparison.isNotEmpty) ...[

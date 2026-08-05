@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:claimsupport/features/prescriptions/data/models/prescription.dart';
 import 'package:claimsupport/features/prescriptions/presentation/controllers/prescription_controller.dart';
 import 'package:intl/intl.dart';
 
@@ -130,7 +129,7 @@ class PrescriptionListScreen extends ConsumerWidget {
                           );
                           if (confirmed == true) {
                             try {
-                              await ref.read(prescriptionProvider.notifier).deletePrescription(prescription.id!);
+                              await ref.read(prescriptionProvider.notifier).deletePrescription(prescription.id);
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(content: Text('Prescription deleted successfully.'), backgroundColor: Colors.green),
@@ -150,38 +149,17 @@ class PrescriptionListScreen extends ConsumerWidget {
                         },
                         child: Card(
                           margin: const EdgeInsets.only(bottom: 16),
-                          color: theme.cardTheme.color ?? theme.cardColor,
+                          elevation: isDark ? 0 : 1,
+                          color: isDark ? const Color(0xFF1E2230) : Colors.white,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(color: isDark ? Colors.grey.shade800 : Colors.transparent),
+                            borderRadius: BorderRadius.circular(16),
+                            side: BorderSide(
+                              color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+                              width: 1,
+                            ),
                           ),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.all(16),
-                            title: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 4),
-                                if (prescription.originalFileName != null && prescription.originalFileName!.isNotEmpty)
-                                  Text(
-                                    prescription.originalFileName!,
-                                    style: const TextStyle(fontSize: 13, color: Colors.grey),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                const SizedBox(height: 2),
-                                if (prescription.createdAt != null)
-                                  Text(
-                                    DateFormat("dd-MM-yyyy hh:mm a").format(prescription.createdAt!.toLocal()),
-                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                  ),
-                              ],
-                            ),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete_outline, color: Colors.red),
-                              tooltip: 'Delete',
-                              onPressed: () => _confirmDelete(context, ref, prescription.id!, label),
-                            ),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
                             onTap: () {
                               if (prescription.gridFsFileId != null) {
                                 context.push('/view-pdf/${prescription.gridFsFileId}?title=${prescription.displayId}');
@@ -191,6 +169,191 @@ class PrescriptionListScreen extends ConsumerWidget {
                                 );
                               }
                             },
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Builder(
+                                builder: (context) {
+                                  final hospitalDisplayName = prescription.hospitalName.trim().isNotEmpty
+                                      ? prescription.hospitalName
+                                      : (prescription.originalFileName ?? 'Prescription / Medical Bill');
+
+                                  final formattedVisitDate = prescription.visitDate != null
+                                      ? DateFormat('dd-MM-yyyy').format(prescription.visitDate!.toLocal())
+                                      : null;
+
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      // Top Header: PSCT ID + Delete Action
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: isDark ? const Color(0xFF065F46).withAlpha(80) : const Color(0xFFECFDF5),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: isDark ? const Color(0xFF10B981).withAlpha(80) : const Color(0xFFA7F3D0),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              prescription.displayId,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                                color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857),
+                                              ),
+                                            ),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                                            tooltip: 'Delete',
+                                            visualDensity: VisualDensity.compact,
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                            onPressed: () => _confirmDelete(context, ref, prescription.id, label),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 10),
+
+                                      // Hospital / Clinic Name
+                                      Text(
+                                        hospitalDisplayName,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15.5,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+
+                                      // Patient Name
+                                      if (prescription.patientName != null && prescription.patientName!.trim().isNotEmpty) ...[
+                                        Row(
+                                          children: [
+                                            Icon(Icons.person_outline, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                "Patient: ${prescription.patientName}",
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: isDark ? Colors.grey.shade300 : Colors.grey.shade800,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                      ],
+
+                                      // Doctor Name
+                                      if (prescription.doctorName.trim().isNotEmpty) ...[
+                                        Row(
+                                          children: [
+                                            Icon(Icons.medical_services_outlined, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                "Doctor: ${prescription.doctorName}",
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                      ],
+
+                                      // Prescription Number
+                                      if (prescription.prescriptionNumber != null && prescription.prescriptionNumber!.trim().isNotEmpty) ...[
+                                        Row(
+                                          children: [
+                                            Icon(Icons.tag, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                "Prescription No: ${prescription.prescriptionNumber}",
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                      ],
+
+                                      // Consult Date
+                                      if (formattedVisitDate != null) ...[
+                                        Row(
+                                          children: [
+                                            Icon(Icons.calendar_today_outlined, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                "Consult Date: $formattedVisitDate",
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                      ],
+
+                                      // Prescription File Name
+                                      if (prescription.originalFileName != null && prescription.originalFileName!.trim().isNotEmpty) ...[
+                                        Row(
+                                          children: [
+                                            Icon(Icons.insert_drive_file_outlined, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                "File: ${prescription.originalFileName}",
+                                                style: TextStyle(
+                                                  fontSize: 12.5,
+                                                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                      ],
+
+                                      // Prescription Uploaded Date with Time (12-hour AM/PM)
+                                      if (prescription.createdAt != null) ...[
+                                        Row(
+                                          children: [
+                                            Icon(Icons.access_time, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                "Uploaded: ${DateFormat('dd-MM-yyyy hh:mm a').format(prescription.createdAt!.toLocal())}",
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ],
+                                  );
+                                },
+                              ),
+                            ),
                           ),
                         ),
                       );

@@ -347,7 +347,9 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen>
             });
             prefs.setString('analysis_result', jsonEncode(data));
             Future.delayed(const Duration(milliseconds: 800), () {
-              if (mounted) context.pushReplacement('/summary');
+              if (mounted && context.mounted) {
+                context.pushReplacement('/summary');
+              }
             });
          }
       });
