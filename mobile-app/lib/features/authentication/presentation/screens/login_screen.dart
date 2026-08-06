@@ -20,7 +20,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _otpSent = false;
 
   void _sendOtp() {
-    final phoneRegex = RegExp(r'^[0-9]{10}$');
+    final phoneRegex = RegExp(r'^[0-9]{1,10}$');
 
     if (_phoneController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -31,7 +31,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     if (!phoneRegex.hasMatch(_phoneController.text)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid 10-digit mobile number.')),
+        const SnackBar(content: Text('Please enter a valid mobile number (1-10 digits).')),
       );
       return;
     }

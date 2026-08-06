@@ -23,7 +23,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   void _sendOtp() {
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-    final phoneRegex = RegExp(r'^[0-9]{10}$');
+    final phoneRegex = RegExp(r'^[0-9]{1,10}$');
 
     if (_nameController.text.isEmpty || _emailController.text.isEmpty || _phoneController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -41,7 +41,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     if (!phoneRegex.hasMatch(_phoneController.text)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid 10-digit mobile number.')),
+        const SnackBar(content: Text('Please enter a valid mobile number (1-10 digits).')),
       );
       return;
     }
