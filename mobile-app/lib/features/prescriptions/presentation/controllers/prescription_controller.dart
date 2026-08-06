@@ -80,8 +80,19 @@ class PrescriptionNotifier extends AsyncNotifier<PaginationResponse<Prescription
       rethrow;
     }
   }
+
+  Future<void> deletePrescriptions(List<String> ids) async {
+    if (ids.isEmpty) return;
+    try {
+      final repository = ref.read(prescriptionRepositoryProvider);
+      await repository.deleteBatchPrescriptions(ids);
+      await fetchPrescriptions(isRefresh: true);
+    } catch (e) {
+      rethrow;
+    }
+  }
 }
 
-final prescriptionProvider = AsyncNotifierProvider<PrescriptionNotifier, PaginationResponse<Prescription>>(() {
+final prescriptionProvider = AsyncNotifierProvider.autoDispose<PrescriptionNotifier, PaginationResponse<Prescription>>(() {
   return PrescriptionNotifier();
 });

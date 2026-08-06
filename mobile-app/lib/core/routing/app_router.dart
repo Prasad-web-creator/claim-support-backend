@@ -22,6 +22,11 @@ import 'package:claimsupport/features/profile/presentation/screens/privacy_polic
 import 'package:claimsupport/features/profile/presentation/screens/settings_screen.dart';
 import 'package:claimsupport/core/presentation/screens/placeholder_detail_screen.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:claimsupport/features/dashboard/presentation/controllers/dashboard_controller.dart';
+import 'package:claimsupport/features/analysis_reports/presentation/controllers/analysis_report_controller.dart';
+import 'package:claimsupport/features/logs/presentation/controllers/log_controller.dart';
+
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
 
@@ -54,10 +59,12 @@ class AppRouter {
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
         builder: (context, state, child) {
-          final theme = Theme.of(context);
-          final isDark = theme.brightness == Brightness.dark;
-          return Scaffold(
-            backgroundColor: theme.scaffoldBackgroundColor,
+          return Consumer(
+            builder: (context, ref, _) {
+              final theme = Theme.of(context);
+              final isDark = theme.brightness == Brightness.dark;
+              return Scaffold(
+                backgroundColor: theme.scaffoldBackgroundColor,
             body: child,
             floatingActionButton: Container(
               height: 64,
@@ -96,7 +103,7 @@ class AppRouter {
                     label: 'Home',
                     isSelected: _calculateSelectedIndex(state.uri.path) == 0,
                     isDark: isDark,
-                    onTap: () => _onItemTapped(0, context),
+                    onTap: () => _onItemTapped(0, context, ref),
                   ),
                   _NavBarItem(
                     icon: Icons.description_outlined,
@@ -104,16 +111,16 @@ class AppRouter {
                     label: 'Reports',
                     isSelected: _calculateSelectedIndex(state.uri.path) == 1,
                     isDark: isDark,
-                    onTap: () => _onItemTapped(1, context),
+                    onTap: () => _onItemTapped(1, context, ref),
                   ),
                   const SizedBox(width: 48), // Space for FAB
                   _NavBarItem(
-                    icon: Icons.auto_awesome_outlined,
-                    activeIcon: Icons.auto_awesome,
-                    label: 'Assistant',
+                    icon: Icons.history_outlined,
+                    activeIcon: Icons.history,
+                    label: 'Logs',
                     isSelected: _calculateSelectedIndex(state.uri.path) == 2,
                     isDark: isDark,
-                    onTap: () => _onItemTapped(2, context),
+                    onTap: () => _onItemTapped(2, context, ref),
                   ),
                   _NavBarItem(
                     icon: Icons.person_outline,
@@ -121,12 +128,14 @@ class AppRouter {
                     label: 'Profile',
                     isSelected: _calculateSelectedIndex(state.uri.path) == 3,
                     isDark: isDark,
-                    onTap: () => _onItemTapped(3, context),
+                    onTap: () => _onItemTapped(3, context, ref),
                   ),
                 ],
               ),
             ),
-          );
+          ); // Closes Scaffold
+            },
+          ); // Closes Consumer
         },
         routes: [
           GoRoute(
@@ -214,21 +223,24 @@ class AppRouter {
   static int _calculateSelectedIndex(String location) {
     if (location.startsWith('/dashboard')) return 0;
     if (location.startsWith('/reports')) return 1;
-    if (location.startsWith('/assistant')) return 2;
+    if (location.startsWith('/activity-logs') || location.startsWith('/logs')) return 2;
     if (location.startsWith('/profile')) return 3;
     return 0;
   }
 
-  static void _onItemTapped(int index, BuildContext context) {
+  static void _onItemTapped(int index, BuildContext context, WidgetRef ref) {
     switch (index) {
       case 0:
+        ref.invalidate(dashboardStatsProvider);
         context.go('/dashboard');
         break;
       case 1:
+        ref.invalidate(analysisReportProvider);
         context.go('/reports');
         break;
       case 2:
-        context.go('/assistant');
+        ref.invalidate(logProvider);
+        context.go('/activity-logs');
         break;
       case 3:
         context.go('/profile');

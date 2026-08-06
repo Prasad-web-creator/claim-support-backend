@@ -74,6 +74,7 @@ class CoverageReportPdfService {
     final coverageBreakdown = data['coverageBreakdown'] as Map<String, dynamic>? ?? {};
     final comparison = data['comparison'] as List<dynamic>? ?? [];
     final coverageAnalysis = data['coverageAnalysis'] as Map<String, dynamic>? ?? {};
+    final clarificationQA = data['clarificationAnswersUsed'] as List<dynamic>? ?? [];
 
     final overallStatus = (data['overallStatus'] ?? 'Unknown').toString();
     final dominanceScore = data['dominanceScore'] ?? 0;
@@ -182,7 +183,7 @@ class CoverageReportPdfService {
             pw.SizedBox(height: 14),
 
             // ─── 2. Executive Summary ───
-            _buildExecutiveSummary(
+            ..._buildExecutiveSummary(
               overallStatus: overallStatus,
               dominanceScore: dominanceScore,
               coverageScore: coverageScore,
@@ -203,7 +204,7 @@ class CoverageReportPdfService {
 
             // ─── 4. Coverage Distribution Donut Chart & Statistics ───
             if (totalCount > 0) ...[
-              _buildChartAndStatisticsSection(
+              ..._buildChartAndStatisticsSection(
                 coveredCount: coveredCount,
                 partialCount: partialCount,
                 notCoveredCount: notCoveredCount,
@@ -213,35 +214,41 @@ class CoverageReportPdfService {
             ],
 
             // ─── 5. Policy & Prescription Detailed Specifications ───
-            _buildDetailedSpecsSection(
+            ..._buildDetailedSpecsSection(
               policyJson: policyJson,
               prescriptionJson: prescriptionJson,
             ),
             pw.SizedBox(height: 14),
 
-            // ─── 6. Coverage Comparison Table ───
+            // ─── 6. Clarification Q&A Section ───
+            if (clarificationQA.isNotEmpty) ...[
+              _buildClarificationQASection(clarificationQA),
+              pw.SizedBox(height: 14),
+            ],
+
+            // ─── 7. Coverage Comparison Table ───
             if (comparison.isNotEmpty) ...[
               _buildComparisonTableSection(comparison),
               pw.SizedBox(height: 14),
             ],
 
-            // ─── 7. Coverage Decision Details (Card-Based Layout) ───
+            // ─── 8. Coverage Decision Details (Card-Based Layout) ───
             if (comparison.isNotEmpty) ...[
-              _buildDecisionDetailsSection(comparison),
+              ..._buildDecisionDetailsSection(comparison),
               pw.SizedBox(height: 14),
             ],
 
-            // ─── 8. Recommendations Section ───
+            // ─── 9. Recommendations Section ───
             if (recommendationsText != null && recommendationsText.isNotEmpty) ...[
               _buildRecommendationsSection(recommendationsText),
               pw.SizedBox(height: 14),
             ],
 
-            // ─── 9. Important Notes Box ───
+            // ─── 10. Important Notes Box ───
             _buildImportantNotesBox(),
             pw.SizedBox(height: 12),
 
-            // ─── 10. Professional Disclaimer ───
+            // ─── 11. Professional Disclaimer ───
             _buildDisclaimerBox(),
           ];
         },
@@ -252,6 +259,158 @@ class CoverageReportPdfService {
   }
 
   // ─── Section Builders ──────────────────────────────────────────────────────
+
+  /// Clarification Q&A section — shows LLM questions and user answers used in analysis.
+  static pw.Widget _buildClarificationQASection(List<dynamic> qaList) {
+    final cyColor = PdfColor.fromHex('#0891B2');
+    final cyLight = PdfColor.fromHex('#ECFEFF');
+    final cyBorder = PdfColor.fromHex('#A5F3FC');
+
+    final items = <pw.Widget>[];
+    for (int i = 0; i < qaList.length; i++) {
+      final qa = qaList[i] as Map<String, dynamic>? ?? {};
+      final title = (qa['Title'] ?? qa['title'] ?? '').toString().trim();
+      final question = (qa['Question'] ?? qa['question'] ?? '').toString().trim();
+      final answer = (qa['User_Answer'] ?? qa['userAnswer'] ?? qa['answer'] ?? '').toString().trim();
+      if (title.isEmpty && question.isEmpty) continue;
+
+      items.add(
+        pw.Container(
+          margin: const pw.EdgeInsets.only(bottom: 8),
+          padding: const pw.EdgeInsets.all(12),
+          decoration: pw.BoxDecoration(
+            color: cyLight,
+            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+            border: pw.Border.all(color: cyBorder, width: 0.8),
+          ),
+          child: pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // Number badge
+              pw.Container(
+                width: 20,
+                height: 20,
+                decoration: pw.BoxDecoration(
+                  color: cyColor,
+                  borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
+                ),
+                child: pw.Center(
+                  child: pw.Text(
+                    '${i + 1}',
+                    style: pw.TextStyle(
+                      fontSize: 10,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.white,
+                    ),
+                  ),
+                ),
+              ),
+              pw.SizedBox(width: 10),
+              pw.Expanded(
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    if (title.isNotEmpty)
+                      pw.Text(
+                        title,
+                        style: pw.TextStyle(
+                          fontSize: 10,
+                          fontWeight: pw.FontWeight.bold,
+                          color: cyColor,
+                        ),
+                      ),
+                    if (question.isNotEmpty) ...[
+                      pw.SizedBox(height: 3),
+                      pw.Text(
+                        question,
+                        style: pw.TextStyle(
+                          fontSize: 9.5,
+                          color: _darkText,
+                          lineSpacing: 1.3,
+                        ),
+                      ),
+                    ],
+                    if (answer.isNotEmpty) ...[
+                      pw.SizedBox(height: 6),
+                      pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: pw.BoxDecoration(
+                          color: _cardBg,
+                          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                          border: pw.Border.all(color: _borderColor, width: 0.6),
+                        ),
+                        child: pw.Row(
+                          children: [
+                            pw.Text(
+                              'Answer: ',
+                              style: pw.TextStyle(
+                                fontSize: 9,
+                                fontWeight: pw.FontWeight.bold,
+                                color: _mutedText,
+                              ),
+                            ),
+                            pw.Expanded(
+                              child: pw.Text(
+                                answer,
+                                style: pw.TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: _darkText,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (items.isEmpty) return pw.SizedBox.shrink();
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        // Section header
+        pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: pw.BoxDecoration(
+            color: cyColor,
+            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+          ),
+          child: pw.Row(
+            children: [
+              pw.Text(
+                'CLARIFICATION Q&A',
+                style: pw.TextStyle(
+                  fontSize: 11,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.white,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              pw.Spacer(),
+              pw.Text(
+                '${items.length} ${items.length == 1 ? 'Question' : 'Questions'}',
+                style: pw.TextStyle(
+                  fontSize: 9,
+                  color: const PdfColor(1, 1, 1, 0.7),
+                ),
+              ),
+            ],
+          ),
+        ),
+        pw.SizedBox(height: 8),
+        ...items,
+      ],
+    );
+  }
 
   /// Header Card with Branding, Title, Report Number, and Timestamps.
   static pw.Widget _buildCoverHeader({
@@ -340,7 +499,7 @@ class CoverageReportPdfService {
   }
 
   /// Executive Summary Card with Big Status, Dominance Score, and Stat Boxes.
-  static pw.Widget _buildExecutiveSummary({
+  static List<pw.Widget> _buildExecutiveSummary({
     required String overallStatus,
     required dynamic dominanceScore,
     required dynamic coverageScore,
@@ -352,20 +511,11 @@ class CoverageReportPdfService {
   }) {
     final statusBadge = _buildStatusBadge(overallStatus, fontSize: 11);
 
-    return pw.Container(
-      padding: const pw.EdgeInsets.all(16),
-      decoration: pw.BoxDecoration(
-        color: _cardBg,
-        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
-        border: pw.Border.all(color: _borderColor, width: 1),
-      ),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
+    return [
+      pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
         children: [
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: pw.CrossAxisAlignment.center,
-            children: [
               pw.Text(
                 'Executive Summary',
                 style: pw.TextStyle(
@@ -430,9 +580,7 @@ class CoverageReportPdfService {
               ),
             ],
           ),
-        ],
-      ),
-    );
+      ];
   }
 
   /// 2-Column Info Section for Policy and Prescription.
@@ -440,6 +588,10 @@ class CoverageReportPdfService {
     required Map<String, dynamic> policyJson,
     required Map<String, dynamic> prescriptionJson,
   }) {
+    final bool isManual = prescriptionJson['isManual'] == true ||
+        prescriptionJson['prescriptionSource'] == 'Self-entered Prescription' ||
+        (prescriptionJson['manualText'] != null && prescriptionJson['manualText'].toString().isNotEmpty);
+
     final policyRows = <pw.Widget>[];
     _addInfoRowIfPresent(policyRows, 'Policy Name', policyJson['policyName']);
     _addInfoRowIfPresent(policyRows, 'Policy Number', policyJson['policyNumber']);
@@ -455,10 +607,13 @@ class CoverageReportPdfService {
     }
 
     final rxRows = <pw.Widget>[];
+    if (isManual) {
+      _addInfoRowIfPresent(rxRows, 'Source', 'Self-entered Prescription');
+      _addInfoRowIfPresent(rxRows, 'Diagnosis', prescriptionJson['diagnosis']);
+    }
     _addInfoRowIfPresent(rxRows, 'Patient Name', prescriptionJson['patientName']);
     _addInfoRowIfPresent(rxRows, 'Treating Doctor', prescriptionJson['doctor'] ?? prescriptionJson['doctorName']);
     _addInfoRowIfPresent(rxRows, 'Hospital / Clinic', prescriptionJson['hospital'] ?? prescriptionJson['hospitalName']);
-    _addInfoRowIfPresent(rxRows, 'Diagnosis', prescriptionJson['diagnosis']);
     _addInfoRowIfPresent(rxRows, 'Visit / Rx Date', prescriptionJson['visitDate'] ?? prescriptionJson['prescriptionDate']);
     if (prescriptionJson['hospitalizationRequired'] != null) {
       _addInfoRowIfPresent(
@@ -485,9 +640,9 @@ class CoverageReportPdfService {
         pw.SizedBox(width: 12),
         pw.Expanded(
           child: _buildInfoCard(
-            title: 'Prescription Information',
-            badgeText: 'Medical Rx',
-            badgeColor: PdfColor.fromHex('#7C3AED'),
+            title: isManual ? 'Self-entered Prescription' : 'Prescription Information',
+            badgeText: isManual ? 'Self-entered Rx' : 'Medical Rx',
+            badgeColor: isManual ? PdfColor.fromHex('#2563EB') : PdfColor.fromHex('#7C3AED'),
             rows: rxRows,
           ),
         ),
@@ -496,7 +651,7 @@ class CoverageReportPdfService {
   }
 
   /// Coverage Distribution Donut Chart with Vector Drawing and Side Legends.
-  static pw.Widget _buildChartAndStatisticsSection({
+  static List<pw.Widget> _buildChartAndStatisticsSection({
     required int coveredCount,
     required int partialCount,
     required int notCoveredCount,
@@ -506,26 +661,19 @@ class CoverageReportPdfService {
     final partialPct = totalCount > 0 ? (partialCount / totalCount) * 100 : 0.0;
     final notCoveredPct = totalCount > 0 ? (notCoveredCount / totalCount) * 100 : 0.0;
 
-    return pw.Container(
-      padding: const pw.EdgeInsets.all(16),
-      decoration: pw.BoxDecoration(
-        color: _cardBg,
-        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
-        border: pw.Border.all(color: _borderColor, width: 1),
+    return [
+      pw.Text(
+        'Coverage Distribution',
+        style: pw.TextStyle(
+          fontSize: 13,
+          fontWeight: pw.FontWeight.bold,
+          color: _darkText,
+        ),
       ),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text(
-            'Coverage Distribution',
-            style: pw.TextStyle(
-              fontSize: 13,
-              fontWeight: pw.FontWeight.bold,
-              color: _darkText,
-            ),
-          ),
-          pw.SizedBox(height: 12),
-          pw.Row(
+      pw.SizedBox(height: 6),
+      pw.Divider(color: _borderColor, thickness: 1),
+      pw.SizedBox(height: 6),
+      pw.Row(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
               // Vector Donut Chart
@@ -586,13 +734,13 @@ class CoverageReportPdfService {
               ),
             ],
           ),
-        ],
-      ),
-    );
+      pw.SizedBox(height: 8),
+      pw.Divider(color: _borderColor, thickness: 1),
+    ];
   }
 
   /// Policy & Prescription Spec Breakdown Cards.
-  static pw.Widget _buildDetailedSpecsSection({
+  static List<pw.Widget> _buildDetailedSpecsSection({
     required Map<String, dynamic> policyJson,
     required Map<String, dynamic> prescriptionJson,
   }) {
@@ -624,31 +772,24 @@ class CoverageReportPdfService {
     if (testsStr.isNotEmpty) _addInfoRowIfPresent(rows, 'Medical Investigations', testsStr);
     if (proceduresStr.isNotEmpty) _addInfoRowIfPresent(rows, 'Recommended Procedures', proceduresStr);
 
-    if (rows.isEmpty) return pw.SizedBox.shrink();
+    if (rows.isEmpty) return [pw.SizedBox.shrink()];
 
-    return pw.Container(
-      padding: const pw.EdgeInsets.all(14),
-      decoration: pw.BoxDecoration(
-        color: _cardBg,
-        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
-        border: pw.Border.all(color: _borderColor, width: 1),
+    return [
+      pw.Text(
+        'Prescribed Medical Breakdown',
+        style: pw.TextStyle(
+          fontSize: 12,
+          fontWeight: pw.FontWeight.bold,
+          color: _darkText,
+        ),
       ),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text(
-            'Prescribed Medical Breakdown',
-            style: pw.TextStyle(
-              fontSize: 12,
-              fontWeight: pw.FontWeight.bold,
-              color: _darkText,
-            ),
-          ),
-          pw.SizedBox(height: 8),
-          ...rows,
-        ],
-      ),
-    );
+      pw.SizedBox(height: 6),
+      pw.Divider(color: _borderColor, thickness: 1),
+      pw.SizedBox(height: 6),
+      ...rows,
+      pw.SizedBox(height: 4),
+      pw.Divider(color: _borderColor, thickness: 1),
+    ];
   }
 
   /// Coverage Comparison Table with Header, Alternating Rows, and Status Badges.
@@ -726,10 +867,8 @@ class CoverageReportPdfService {
   }
 
   /// Card-Based Coverage Decision Details with Quotation-Styled Policy Evidence.
-  static pw.Widget _buildDecisionDetailsSection(List<dynamic> comparison) {
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
+  static List<pw.Widget> _buildDecisionDetailsSection(List<dynamic> comparison) {
+    return [
         pw.Text(
           'Coverage Decision Details & Policy Evidence',
           style: pw.TextStyle(
@@ -756,17 +895,19 @@ class CoverageReportPdfService {
               ? _successGreenBorder
               : (isPartial ? _warningAmberBorder : _dangerRedBorder);
 
-          return pw.Container(
-            margin: const pw.EdgeInsets.only(bottom: 10),
-            padding: const pw.EdgeInsets.all(12),
-            decoration: pw.BoxDecoration(
-              color: _cardBg,
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-              border: pw.Border.all(color: cardBorderColor, width: 1),
-            ),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
+          return pw.Wrap(
+            children: [
+              pw.Container(
+                margin: const pw.EdgeInsets.only(bottom: 10),
+                padding: const pw.EdgeInsets.all(12),
+                decoration: pw.BoxDecoration(
+                  color: _cardBg,
+                  borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+                  border: pw.Border.all(color: cardBorderColor, width: 1),
+                ),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
                 // Top Row: Item Name, Category Tag & Status Badge
                 pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -817,6 +958,7 @@ class CoverageReportPdfService {
                     policyEvidence != 'null') ...[
                   pw.SizedBox(height: 6),
                   pw.Container(
+                    width: double.infinity,
                     padding: const pw.EdgeInsets.all(8),
                     decoration: pw.BoxDecoration(
                       color: _lightBg,
@@ -861,23 +1003,27 @@ class CoverageReportPdfService {
                     style: pw.TextStyle(fontSize: 8, color: _mutedText),
                   ),
                 ],
-              ],
-            ),
+                  ],
+                ),
+              ),
+            ],
           );
         }),
-      ],
-    );
+      ];
   }
 
   /// Recommendations Highlight Box.
   static pw.Widget _buildRecommendationsSection(String recommendations) {
-    return pw.Container(
-      padding: const pw.EdgeInsets.all(14),
-      decoration: pw.BoxDecoration(
-        color: _lightBg,
-        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
-        border: pw.Border.all(color: _borderColor, width: 1),
-      ),
+    return pw.Wrap(
+      children: [
+        pw.Container(
+          width: double.infinity,
+          padding: const pw.EdgeInsets.all(14),
+          decoration: pw.BoxDecoration(
+            color: _lightBg,
+            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
+            border: pw.Border.all(color: _borderColor, width: 1),
+          ),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
@@ -900,18 +1046,23 @@ class CoverageReportPdfService {
           ),
         ],
       ),
-    );
+    ), // Close Container
+      ], // Close children list
+    ); // Close Wrap
   }
 
   /// Important Notes Box with Amber Highlight.
   static pw.Widget _buildImportantNotesBox() {
-    return pw.Container(
-      padding: const pw.EdgeInsets.all(12),
-      decoration: pw.BoxDecoration(
-        color: _warningAmberLight,
-        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-        border: pw.Border.all(color: _warningAmberBorder, width: 1),
-      ),
+    return pw.Wrap(
+      children: [
+        pw.Container(
+          width: double.infinity,
+          padding: const pw.EdgeInsets.all(12),
+          decoration: pw.BoxDecoration(
+            color: _warningAmberLight,
+            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+            border: pw.Border.all(color: _warningAmberBorder, width: 1),
+          ),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
@@ -938,7 +1089,9 @@ class CoverageReportPdfService {
           ),
         ],
       ),
-    );
+    ), // Close Container
+      ], // Close children list
+    ); // Close Wrap
   }
 
   /// Professional Disclaimer Footer Box.
@@ -1078,8 +1231,8 @@ class CoverageReportPdfService {
             style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: _mutedText),
           ),
           pw.SizedBox(height: 2),
-          pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.end,
+          pw.Wrap(
+            crossAxisAlignment: pw.WrapCrossAlignment.end,
             children: [
               pw.Text(
                 value,
@@ -1161,14 +1314,18 @@ class CoverageReportPdfService {
         child: pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.SizedBox(
-              width: 80,
-              child: pw.Text(
-                label,
-                style: pw.TextStyle(fontSize: 8, color: _mutedText, fontWeight: pw.FontWeight.bold),
+            pw.Expanded(
+              flex: 3,
+              child: pw.Padding(
+                padding: const pw.EdgeInsets.only(right: 8),
+                child: pw.Text(
+                  label,
+                  style: pw.TextStyle(fontSize: 8, color: _mutedText, fontWeight: pw.FontWeight.bold),
+                ),
               ),
             ),
             pw.Expanded(
+              flex: 7,
               child: pw.Text(
                 strVal,
                 style: pw.TextStyle(fontSize: 8.5, color: _darkText, fontWeight: pw.FontWeight.bold),

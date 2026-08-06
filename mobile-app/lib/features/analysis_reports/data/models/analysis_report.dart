@@ -45,12 +45,12 @@ class AnalysisReport {
 
   String get displayReportNumber {
     if (reportNumber != null) {
-      return 'AN${reportNumber.toString().padLeft(4, '0')}';
+      return 'CR-${reportNumber.toString().padLeft(4, '0')}';
     }
     if (id.isNotEmpty) {
-      return id.length >= 6 ? 'AN${id.substring(0, 4).toUpperCase()}' : 'AN$id';
+      return id.length >= 6 ? 'CR-${id.substring(0, 4).toUpperCase()}' : 'CR-$id';
     }
-    return 'AN0001';
+    return 'CR-0001';
   }
 
   String get displayPolicyName {

@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:claimsupport/features/assistant/data/repositories/rag_repository.dart';
 
-final ragControllerProvider = AsyncNotifierProvider<RagController, Map<String, dynamic>?>(RagController.new);
+final ragControllerProvider = AsyncNotifierProvider.autoDispose<RagController, Map<String, dynamic>?>(RagController.new);
 
 class RagController extends AsyncNotifier<Map<String, dynamic>?> {
   

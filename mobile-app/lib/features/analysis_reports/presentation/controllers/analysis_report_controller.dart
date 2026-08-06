@@ -74,8 +74,19 @@ class AnalysisReportNotifier extends AsyncNotifier<PaginationResponse<AnalysisRe
       rethrow;
     }
   }
+
+  Future<void> deleteReports(List<String> ids) async {
+    if (ids.isEmpty) return;
+    try {
+      final repository = ref.read(analysisReportRepositoryProvider);
+      await repository.deleteBatchAnalysisReports(ids);
+      await fetchAnalysisReports(isRefresh: true);
+    } catch (e) {
+      rethrow;
+    }
+  }
 }
 
-final analysisReportProvider = AsyncNotifierProvider<AnalysisReportNotifier, PaginationResponse<AnalysisReport>>(() {
+final analysisReportProvider = AsyncNotifierProvider.autoDispose<AnalysisReportNotifier, PaginationResponse<AnalysisReport>>(() {
   return AnalysisReportNotifier();
 });

@@ -1,0 +1,597 @@
+import 'package:flutter/material.dart';
+import 'dart:developer' as developer;
+
+// ─── Individual Question Widgets ────────────────────────────────────────────
+// Each question is its own StatefulWidget so that setState() only
+// rebuilds the ONE question card that changed, not the entire dialog.
+
+class _SingleChoiceQuestion extends StatefulWidget {
+  final Map<String, dynamic> question;
+  final String? currentValue;
+  final ValueChanged<String?> onChanged;
+
+  const _SingleChoiceQuestion({
+    super.key,
+    required this.question,
+    required this.currentValue,
+    required this.onChanged,
+  });
+
+  @override
+  State<_SingleChoiceQuestion> createState() => _SingleChoiceQuestionState();
+}
+
+class _SingleChoiceQuestionState extends State<_SingleChoiceQuestion> {
+  String? _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.currentValue;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final surfaceColor = isDark ? const Color(0xFF1F2937) : const Color(0xFFF3F4F6);
+    final options = List<dynamic>.from(widget.question['options'] ?? []);
+
+    if (options.isEmpty) {
+      return _TextInputWidget(
+        question: widget.question,
+        onChanged: (val) => widget.onChanged(val),
+      );
+    }
+
+    return Column(
+      children: options.map((opt) {
+        final optStr = opt.toString();
+        final isSelected = _selected == optStr;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8.0),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                setState(() => _selected = optStr);
+                widget.onChanged(optStr);
+                developer.log('[Clarification] Single choice selected: $optStr for question ${widget.question['id']}');
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Ink(
+                decoration: BoxDecoration(
+                  color: isSelected ? theme.colorScheme.primary.withOpacity(0.1) : surfaceColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isSelected ? theme.colorScheme.primary : Colors.transparent,
+                    width: 1.5,
+                  ),
+                ),
+                child: RadioListTile<String>(
+                  dense: true,
+                  title: Text(optStr, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+                  value: optStr,
+                  groupValue: _selected,
+                  activeColor: theme.colorScheme.primary,
+                  onChanged: (val) {
+                    setState(() => _selected = val);
+                    widget.onChanged(val);
+                    developer.log('[Clarification] Radio changed: $val for question ${widget.question['id']}');
+                  },
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _MultiChoiceQuestion extends StatefulWidget {
+  final Map<String, dynamic> question;
+  final List<String> currentValues;
+  final ValueChanged<List<String>> onChanged;
+
+  const _MultiChoiceQuestion({
+    super.key,
+    required this.question,
+    required this.currentValues,
+    required this.onChanged,
+  });
+
+  @override
+  State<_MultiChoiceQuestion> createState() => _MultiChoiceQuestionState();
+}
+
+class _MultiChoiceQuestionState extends State<_MultiChoiceQuestion> {
+  late List<String> _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = List<String>.from(widget.currentValues);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final surfaceColor = isDark ? const Color(0xFF1F2937) : const Color(0xFFF3F4F6);
+    final options = List<dynamic>.from(widget.question['options'] ?? []);
+
+    if (options.isEmpty) {
+      return _TextInputWidget(
+        question: widget.question,
+        onChanged: (val) => widget.onChanged(val != null ? [val] : []),
+      );
+    }
+
+    return Column(
+      children: options.map((opt) {
+        final optStr = opt.toString();
+        final isSelected = _selected.contains(optStr);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8.0),
+          child: Material(
+            color: Colors.transparent,
+            child: Ink(
+              decoration: BoxDecoration(
+                color: isSelected ? theme.colorScheme.primary.withOpacity(0.1) : surfaceColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isSelected ? theme.colorScheme.primary : Colors.transparent,
+                  width: 1.5,
+                ),
+              ),
+              child: CheckboxListTile(
+                dense: true,
+                title: Text(optStr, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+                value: isSelected,
+                activeColor: theme.colorScheme.primary,
+                onChanged: (val) {
+                  setState(() {
+                    if (val == true) {
+                      _selected.add(optStr);
+                    } else {
+                      _selected.remove(optStr);
+                    }
+                  });
+                  widget.onChanged(List<String>.from(_selected));
+                  developer.log('[Clarification] Multi-choice updated: $_selected for question ${widget.question['id']}');
+                },
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _BooleanQuestion extends StatefulWidget {
+  final Map<String, dynamic> question;
+  final bool? currentValue;
+  final ValueChanged<bool> onChanged;
+
+  const _BooleanQuestion({
+    super.key,
+    required this.question,
+    required this.currentValue,
+    required this.onChanged,
+  });
+
+  @override
+  State<_BooleanQuestion> createState() => _BooleanQuestionState();
+}
+
+class _BooleanQuestionState extends State<_BooleanQuestion> {
+  late bool _value;
+
+  @override
+  void initState() {
+    super.initState();
+    _value = widget.currentValue ?? false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final surfaceColor = isDark ? const Color(0xFF1F2937) : const Color(0xFFF3F4F6);
+
+    return Material(
+      color: Colors.transparent,
+      child: Ink(
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: SwitchListTile(
+          dense: true,
+          title: const Text('Yes / No', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+          value: _value,
+          activeColor: theme.colorScheme.primary,
+          onChanged: (val) {
+            setState(() => _value = val);
+            widget.onChanged(val);
+            developer.log('[Clarification] Boolean changed: $val for question ${widget.question['id']}');
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _TextInputWidget extends StatefulWidget {
+  final Map<String, dynamic> question;
+  final ValueChanged<String?> onChanged;
+
+  const _TextInputWidget({super.key, required this.question, required this.onChanged});
+
+  @override
+  State<_TextInputWidget> createState() => _TextInputWidgetState();
+}
+
+class _TextInputWidgetState extends State<_TextInputWidget> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final surfaceColor = isDark ? const Color(0xFF1F2937) : const Color(0xFFF3F4F6);
+    final type = widget.question['type'] ?? 'text';
+
+    return TextFormField(
+      controller: _controller,
+      keyboardType: type == 'number' ? TextInputType.number : TextInputType.text,
+      onChanged: (val) {
+        widget.onChanged(val.isEmpty ? null : val);
+      },
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: surfaceColor,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Main Dialog ─────────────────────────────────────────────────────────────
+
+class ClarificationDialog extends StatefulWidget {
+  final Map<String, dynamic> clarificationData;
+  final Function(Map<String, dynamic>) onSubmit;
+  final VoidCallback onCancel;
+
+  const ClarificationDialog({
+    Key? key,
+    required this.clarificationData,
+    required this.onSubmit,
+    required this.onCancel,
+  }) : super(key: key);
+
+  @override
+  _ClarificationDialogState createState() => _ClarificationDialogState();
+}
+
+class _ClarificationDialogState extends State<ClarificationDialog> {
+  // Answers stored centrally in the parent dialog, but individual
+  // question widgets manage their own visual state locally.
+  final Map<String, dynamic> _answers = {};
+  late final List<dynamic> _questions;
+
+  @override
+  void initState() {
+    super.initState();
+    _questions = widget.clarificationData['questions'] ?? [];
+    developer.log('[Clarification] Dialog opened with ${_questions.length} questions: '
+        '${_questions.map((q) => q['id']).toList()}');
+  }
+
+  bool _canSubmit() {
+    for (var q in _questions) {
+      if (q['required'] == true) {
+        final answer = _answers[q['id']];
+        if (answer == null) return false;
+        if (answer is String && answer.trim().isEmpty) return false;
+        if (answer is List && answer.isEmpty) return false;
+      }
+    }
+    return true;
+  }
+
+  void _onAnswerChanged(String questionId, dynamic value) {
+    setState(() {
+      _answers[questionId] = value;
+    });
+    developer.log('[Clarification] Answer stored: $questionId = $value');
+  }
+
+  void _handleSubmit() {
+    developer.log('[Clarification] Submit pressed. Payload: $_answers');
+    widget.onSubmit(Map<String, dynamic>.from(_answers));
+  }
+
+  Widget _buildQuestionInput(Map<String, dynamic> q) {
+    final String type = q['type'] ?? 'text';
+    final String id = q['id'];
+
+    switch (type) {
+      case 'single_choice':
+        return _SingleChoiceQuestion(
+          key: ValueKey('sc_$id'),
+          question: q,
+          currentValue: _answers[id] as String?,
+          onChanged: (val) => _onAnswerChanged(id, val),
+        );
+      case 'multi_choice':
+        return _MultiChoiceQuestion(
+          key: ValueKey('mc_$id'),
+          question: q,
+          currentValues: (_answers[id] as List<String>?) ?? [],
+          onChanged: (val) => _onAnswerChanged(id, val),
+        );
+      case 'boolean':
+        return _BooleanQuestion(
+          key: ValueKey('bool_$id'),
+          question: q,
+          currentValue: _answers[id] as bool?,
+          onChanged: (val) => _onAnswerChanged(id, val),
+        );
+      case 'text':
+      case 'number':
+      default:
+        return _TextInputWidget(
+          key: ValueKey('text_$id'),
+          question: q,
+          onChanged: (val) => _onAnswerChanged(id, val),
+        );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final Color textColor = isDark ? Colors.white : const Color(0xFF111827);
+    final Color textSecondary = isDark ? Colors.grey.shade400 : const Color(0xFF6B7280);
+    final Color primaryColor = theme.colorScheme.primary;
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
+      elevation: 8,
+      backgroundColor: isDark ? const Color(0xFF1F2937) : Colors.white,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: SizedBox(
+        width: double.infinity,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Header ──────────────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF111827) : const Color(0xFFF9FAFB),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey.withOpacity(0.15)),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withOpacity(0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.help_outline_rounded, color: primaryColor, size: 22),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Clarification Needed',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            color: textColor,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Answer to complete your coverage analysis.',
+                          style: TextStyle(fontSize: 12, color: textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Scrollable Questions ─────────────────────────────────
+            Flexible(
+              child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                shrinkWrap: true,
+                physics: const BouncingScrollPhysics(),
+                itemCount: _questions.length,
+                itemBuilder: (context, index) {
+                  final q = _questions[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Question header
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              margin: const EdgeInsets.only(top: 1, right: 10),
+                              width: 22,
+                              height: 22,
+                              decoration: BoxDecoration(
+                                color: primaryColor,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '${index + 1}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    q['title'] ?? 'Question ${index + 1}',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: textColor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    q['question'] ?? '',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: textColor.withOpacity(0.75),
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                  if (q['reason'] != null && (q['reason'] as String).isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.amber.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                                      ),
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Padding(
+                                            padding: const EdgeInsets.only(top: 1.0),
+                                            child: Icon(Icons.info_outline, size: 13, color: Colors.amber.shade700),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Text(
+                                              q['reason'],
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontStyle: FontStyle.italic,
+                                                color: isDark ? Colors.amber.shade200 : Colors.amber.shade900,
+                                                height: 1.4,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // Input widget — isolated StatefulWidget per question
+                        _buildQuestionInput(q),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            // ── Footer ───────────────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: Colors.grey.withOpacity(0.15))),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        developer.log('[Clarification] Cancel pressed');
+                        widget.onCancel();
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        foregroundColor: textSecondary,
+                        side: BorderSide(color: Colors.grey.withOpacity(0.4)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton(
+                      onPressed: _canSubmit() ? _handleSubmit : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: primaryColor.withOpacity(0.3),
+                        disabledForegroundColor: Colors.white.withOpacity(0.6),
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text(
+                        'Submit Answers',
+                        style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.2),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

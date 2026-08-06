@@ -6,6 +6,7 @@ import 'package:claimsupport/core/network/api_client.dart';
 import 'package:claimsupport/core/utils/shared_prefs.dart';
 import 'package:claimsupport/features/summary/presentation/widgets/coverage_donut_chart.dart';
 import 'package:claimsupport/features/summary/services/coverage_report_pdf_service.dart';
+import 'package:claimsupport/features/dashboard/presentation/controllers/dashboard_controller.dart';
 
 class SummaryScreen extends ConsumerStatefulWidget {
   final String? reportId;
@@ -78,30 +79,8 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
         final policyJson = data['policyJson'] as Map<String, dynamic>? ?? {};
         final prescriptionJson = data['prescriptionJson'] as Map<String, dynamic>? ?? {};
         final processingTime = data['processingTimeMs'] ?? 0;
-
-        // Determine status color
-        Color statusColor;
-        IconData statusIcon;
-        Color statusBg;
-        Color statusBorder;
-        if (overallStatus == 'Covered') {
-          statusColor = successGreen;
-          statusIcon = Icons.check_circle;
-          statusBg = isDark ? successGreen.withAlpha(20) : const Color(0xFFECFDF5);
-          statusBorder = isDark ? successGreen.withAlpha(50) : const Color(0xFFA7F3D0);
-        } else if (overallStatus == 'Not Covered') {
-          statusColor = dangerRed;
-          statusIcon = Icons.cancel;
-          statusBg = isDark ? dangerRed.withAlpha(20) : const Color(0xFFFEF2F2);
-          statusBorder = isDark ? dangerRed.withAlpha(50) : const Color(0xFFFECACA);
-        } else {
-          statusColor = warningAmber;
-          statusIcon = Icons.warning_amber_rounded;
-          statusBg = isDark ? warningAmber.withAlpha(20) : const Color(0xFFFFFBEB);
-          statusBorder = isDark ? warningAmber.withAlpha(50) : const Color(0xFFFDE68A);
-        }
-
-        final bool isInvalid = overallStatus.startsWith('Invalid');
+        // Clarification Q&A from LLM interactive session
+        final clarificationQA = data['clarificationAnswersUsed'] as List<dynamic>? ?? [];
 
         // Document & validation statuses
         final docValidity = data['documentValidity'] as Map<String, dynamic>?;
@@ -127,14 +106,105 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
           isPrescriptionValid = false;
         }
 
-        final lowerOverall = overallStatus.toLowerCase();
-        if (lowerOverall.startsWith('invalid policy')) {
+        // Check contents of policy and prescription defensively
+        final isCompanyEmpty = (policyJson['insuranceCompany'] == null ||
+            policyJson['insuranceCompany'].toString().trim().isEmpty ||
+            policyJson['insuranceCompany'].toString().toLowerCase() == 'unknown' ||
+            policyJson['insuranceCompany'].toString().toLowerCase() == 'none');
+        final isPolicyNumEmpty = (policyJson['policyNumber'] == null ||
+            policyJson['policyNumber'].toString().trim().isEmpty ||
+            policyJson['policyNumber'].toString().toLowerCase() == 'unknown' ||
+            policyJson['policyNumber'].toString().toLowerCase() == 'none');
+        final isPolicyNameEmpty = (policyJson['policyName'] == null ||
+            policyJson['policyName'].toString().trim().isEmpty ||
+            policyJson['policyName'].toString().toLowerCase() == 'unknown' ||
+            policyJson['policyName'].toString().toLowerCase() == 'none');
+
+        if (isCompanyEmpty && isPolicyNumEmpty && isPolicyNameEmpty && comparison.isEmpty) {
           isPolicyValid = false;
-        } else if (lowerOverall.startsWith('invalid prescription')) {
+        }
+
+        final isDiagEmpty = (prescriptionJson['diagnosis'] == null ||
+            prescriptionJson['diagnosis'].toString().trim().isEmpty ||
+            prescriptionJson['diagnosis'].toString().toLowerCase() == 'unknown' ||
+            prescriptionJson['diagnosis'].toString().toLowerCase() == 'none');
+        final hasRxItems = ((prescriptionJson['medicines'] as List?)?.isNotEmpty == true) ||
+            ((prescriptionJson['medicalTests'] as List?)?.isNotEmpty == true) ||
+            ((prescriptionJson['procedures'] as List?)?.isNotEmpty == true) ||
+            ((prescriptionJson['symptoms'] as List?)?.isNotEmpty == true);
+
+        final isManualRx = prescriptionJson['isManual'] == true ||
+            data['isManualPrescription'] == true ||
+            prescriptionJson['prescriptionSource'] == 'Self-entered Prescription' ||
+            (prescriptionJson['manualText'] != null && prescriptionJson['manualText'].toString().isNotEmpty);
+
+        if (isDiagEmpty && !hasRxItems && comparison.isEmpty && !isManualRx) {
+          isPrescriptionValid = false;
+        }
+
+        final lowerOverall = overallStatus.toLowerCase();
+        if (lowerOverall.startsWith('invalid policy and prescription') ||
+            (lowerOverall.contains('invalid policy') && lowerOverall.contains('prescription')) ||
+            (lowerOverall.contains('policy and prescription') && lowerOverall.contains('invalid'))) {
+          isPolicyValid = false;
+          isPrescriptionValid = false;
+        } else if (lowerOverall.startsWith('invalid policy') || lowerOverall.contains('invalid policy')) {
+          isPolicyValid = false;
+        } else if (lowerOverall.startsWith('invalid prescription') || lowerOverall.contains('invalid prescription')) {
           isPrescriptionValid = false;
         } else if (lowerOverall.startsWith('invalid')) {
           isPolicyValid = false;
           isPrescriptionValid = false;
+        } else if (lowerOverall == 'unknown' || lowerOverall.isEmpty) {
+          if (!isPolicyValid && !isPrescriptionValid) {
+            isPolicyValid = false;
+            isPrescriptionValid = false;
+          } else if (!isPolicyValid) {
+            isPolicyValid = false;
+          } else if (!isPrescriptionValid) {
+            isPrescriptionValid = false;
+          } else if (comparison.isEmpty) {
+            isPrescriptionValid = false;
+          }
+        }
+
+        final bool isDocumentInvalid = !isPolicyValid || !isPrescriptionValid || lowerOverall.startsWith('invalid') || lowerOverall == 'unknown';
+
+        // Determine specific invalid status title and disclaimer
+        String invalidStatusTitle = 'Invalid Document';
+        String invalidDisclaimer = 'The uploaded document(s) could not be analyzed because they are invalid or unsupported. Please ensure you upload valid health insurance policy and medical prescription documents and try again.';
+
+        if (!isPolicyValid && !isPrescriptionValid) {
+          invalidStatusTitle = 'Invalid Policy and Prescription';
+          invalidDisclaimer = 'The uploaded Policy and Prescription documents could not be analyzed because they are invalid, unreadable, or unsupported. Please ensure you upload a valid health insurance policy and a medical prescription document (PDF, JPG, PNG) and try again.';
+        } else if (!isPolicyValid) {
+          invalidStatusTitle = 'Invalid Policy';
+          invalidDisclaimer = 'The uploaded Policy document could not be analyzed because it is invalid, unreadable, or unsupported. Please ensure you upload a valid health insurance policy document (PDF, JPG, PNG) and try again.';
+        } else if (!isPrescriptionValid) {
+          invalidStatusTitle = 'Invalid Prescription';
+          invalidDisclaimer = 'The uploaded Prescription document could not be analyzed because it is invalid, unreadable, or unsupported. Please ensure you upload a valid medical prescription document (PDF, JPG, PNG) and try again.';
+        }
+
+        // Determine status color for valid summary
+        Color statusColor;
+        IconData statusIcon;
+        Color statusBg;
+        Color statusBorder;
+        if (overallStatus == 'Covered') {
+          statusColor = successGreen;
+          statusIcon = Icons.check_circle;
+          statusBg = isDark ? successGreen.withAlpha(20) : const Color(0xFFECFDF5);
+          statusBorder = isDark ? successGreen.withAlpha(50) : const Color(0xFFA7F3D0);
+        } else if (overallStatus == 'Not Covered') {
+          statusColor = dangerRed;
+          statusIcon = Icons.cancel;
+          statusBg = isDark ? dangerRed.withAlpha(20) : const Color(0xFFFEF2F2);
+          statusBorder = isDark ? dangerRed.withAlpha(50) : const Color(0xFFFECACA);
+        } else {
+          statusColor = warningAmber;
+          statusIcon = Icons.warning_amber_rounded;
+          statusBg = isDark ? warningAmber.withAlpha(20) : const Color(0xFFFFFBEB);
+          statusBorder = isDark ? warningAmber.withAlpha(50) : const Color(0xFFFDE68A);
         }
 
         return Scaffold(
@@ -166,8 +236,8 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                           ),
                         ),
                       ),
-                      // Download PDF Button (Only when analysis and validations are valid)
-                      if (!isInvalid && isPolicyValid && isPrescriptionValid) ...[
+                      // Download PDF Button (Only when analysis and validations are completely valid)
+                      if (!isDocumentInvalid) ...[
                         const SizedBox(width: 8),
                         _isGeneratingPdf
                             ? Container(
@@ -221,486 +291,711 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // ─── Coverage Status Card ───
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: statusBg,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: statusBorder),
+                  if (isDocumentInvalid) ...[
+                    // ─── Invalid Document View (Only Status Message & Disclaimer) ───
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                      decoration: BoxDecoration(
+                        color: isDark ? dangerRed.withAlpha(20) : const Color(0xFFFEF2F2),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: isDark ? dangerRed.withAlpha(50) : const Color(0xFFFECACA),
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              color: dangerRed.withAlpha(25),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Icon(Icons.cancel_outlined, color: dangerRed, size: 36),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          Text(
+                            invalidStatusTitle,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: textColor,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    child: Stack(
-                      children: [
-                        if (processingTime > 0)
-                          Positioned(
-                            top: 0,
-                            right: 0,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? Colors.black.withAlpha(50)
-                                    : Colors.white.withAlpha(200),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: statusColor.withAlpha(50),
-                                  width: 0.8,
+                    const SizedBox(height: 20),
+
+                    // Disclaimer
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isDark ? Colors.amber.withAlpha(40) : const Color(0xFFFDE68A),
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.info_outline_rounded,
+                            color: Color(0xFFD97706),
+                            size: 22,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              invalidDisclaimer,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: isDark ? Colors.grey.shade300 : const Color(0xFF92400E),
+                                height: 1.5,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else ...[
+                    // ─── Valid Analysis Coverage Summary View ───
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: statusBg,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: statusBorder),
+                      ),
+                      child: Stack(
+                        children: [
+                          if (processingTime > 0)
+                            Positioned(
+                              top: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? Colors.black.withAlpha(50)
+                                      : Colors.white.withAlpha(200),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: statusColor.withAlpha(50),
+                                    width: 0.8,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.timer_outlined,
+                                        size: 12, color: statusColor),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${(processingTime / 1000).toStringAsFixed(1)}s',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: statusColor,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
+                            ),
+                          Column(
+                            children: [
+                              Container(
+                                width: 64,
+                                height: 64,
+                                decoration: BoxDecoration(
+                                  color: statusColor.withAlpha(25),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Center(
+                                  child: Icon(statusIcon, color: statusColor, size: 32),
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              Text(
+                                overallStatus,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: textColor,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '$dominanceScore% Dominance Score',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: statusColor,
+                                ),
+                              ),
+                              if (coverageBreakdown.isNotEmpty) ...[
+                                const SizedBox(height: 12),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? Colors.black.withAlpha(20) : Colors.white.withAlpha(150),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Text(
+                                        'Coverage Breakdown',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: textSecondary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                        children: [
+                                          _buildBreakdownStat('Covered', coverageBreakdown['covered'] ?? 0, successGreen),
+                                          _buildBreakdownStat('Partial', coverageBreakdown['partiallyCovered'] ?? 0, warningAmber),
+                                          _buildBreakdownStat('Not Covered', coverageBreakdown['notCovered'] ?? 0, dangerRed),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 20),
+                              Text(
+                                summaryText,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: textSecondary,
+                                  height: 1.6,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Policy Summary
+                    if (policyJson.isNotEmpty)
+                      _buildInfoCard(
+                        isDark: isDark,
+                        theme: theme,
+                        title: 'Policy Summary',
+                        icon: Icons.policy_outlined,
+                        iconColor: primaryBlue,
+                        items: [
+                          _infoRow(isDark, 'Company', policyJson['insuranceCompany']),
+                          _infoRow(isDark, 'Policy', policyJson['policyName']),
+                          _infoRow(isDark, 'Number', policyJson['policyNumber']),
+                          _infoRow(isDark, 'Type', policyJson['policyType']),
+                          _infoRow(isDark, 'Coverage', policyJson['coverageAmount'] != null
+                              ? '₹${policyJson['coverageAmount']}'
+                              : null),
+                          _infoRow(isDark, 'Max Claim', policyJson['maximumClaimAmount'] != null
+                              ? '₹${policyJson['maximumClaimAmount']}'
+                              : null),
+                        ],
+                      ),
+                    const SizedBox(height: 16),
+
+                    // Prescription Summary
+                    if (prescriptionJson.isNotEmpty)
+                      Builder(
+                        builder: (context) {
+                          final bool isManual = prescriptionJson['isManual'] == true ||
+                              data['isManualPrescription'] == true ||
+                              prescriptionJson['prescriptionSource'] == 'Self-entered Prescription' ||
+                              (prescriptionJson['manualText'] != null && prescriptionJson['manualText'].toString().isNotEmpty);
+
+                          return _buildInfoCard(
+                            isDark: isDark,
+                            theme: theme,
+                            title: isManual ? 'Prescription Summary (Self-entered)' : 'Prescription Summary',
+                            icon: isManual ? Icons.edit_note_rounded : Icons.medical_information_outlined,
+                            iconColor: isManual ? const Color(0xFF2563EB) : const Color(0xFF7C3AED),
+                            items: [
+                              if (isManual)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: isDark ? const Color(0xFF1E3A8A).withAlpha(80) : const Color(0xFFEFF6FF),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: isDark ? const Color(0xFF3B82F6).withAlpha(100) : const Color(0xFFBFDBFE),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.check_circle_outline, size: 14, color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB)),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Self-entered Prescription',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              _infoRow(isDark, 'Patient', prescriptionJson['patientName']),
+                              _infoRow(isDark, 'Hospital', prescriptionJson['hospitalName']),
+                              _infoRow(isDark, 'Doctor', prescriptionJson['doctorName']),
+                              if (isManual)
+                                _infoRow(isDark, 'Diagnosis', prescriptionJson['diagnosis']),
+                              _infoRow(isDark, 'Hospitalization',
+                                  prescriptionJson['hospitalizationRequired'] == true
+                                      ? 'Required'
+                                      : prescriptionJson['hospitalizationRequired'] == false
+                                          ? 'Not Required'
+                                          : null),
+                              _infoRow(isDark, 'Est. Cost',
+                                  prescriptionJson['estimatedTreatmentCost'] != null
+                                      ? '₹${prescriptionJson['estimatedTreatmentCost']}'
+                                      : null),
+                            ],
+                          );
+                        },
+                      ),
+                    const SizedBox(height: 24),
+
+                    // ─── Clarification Q&A Section ───
+                    if (clarificationQA.isNotEmpty) ...[ 
+                      _buildSectionTitle('Clarification Q&A', Icons.question_answer_outlined, const Color(0xFF0891B2), isDark, textColor),
+                      const SizedBox(height: 12),
+                      ...clarificationQA.asMap().entries.map((entry) {
+                        final idx = entry.key;
+                        final qa = entry.value as Map<String, dynamic>? ?? {};
+                        final title = (qa['Title'] ?? qa['title'] ?? '').toString().trim();
+                        final question = (qa['Question'] ?? qa['question'] ?? '').toString().trim();
+                        final answer = (qa['User_Answer'] ?? qa['userAnswer'] ?? qa['answer'] ?? '').toString().trim();
+                        if (question.isEmpty && title.isEmpty) return const SizedBox.shrink();
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0C4A6E).withAlpha(30) : const Color(0xFFECFEFF),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isDark ? const Color(0xFF0891B2).withAlpha(60) : const Color(0xFFA5F3FC),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(Icons.timer_outlined,
-                                      size: 12, color: statusColor),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${(processingTime / 1000).toStringAsFixed(1)}s',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: statusColor,
+                                  Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF0891B2),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        '${idx + 1}',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        if (title.isNotEmpty)
+                                          Text(
+                                            title,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                              color: const Color(0xFF0891B2),
+                                            ),
+                                          ),
+                                        if (question.isNotEmpty) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            question,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: isDark ? Colors.grey.shade300 : const Color(0xFF374151),
+                                              height: 1.4,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                          ),
-                        Column(
-                          children: [
-                            Container(
-                              width: 64,
-                              height: 64,
-                              decoration: BoxDecoration(
-                                color: statusColor.withAlpha(25),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Center(
-                                child: Icon(statusIcon, color: statusColor, size: 32),
-                              ),
-                            ),
-                        const SizedBox(height: 20),
-                        Text(
-                          overallStatus,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: textColor,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '$dominanceScore% Dominance Score',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: statusColor,
-                          ),
-                        ),
-                        if (coverageBreakdown.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: isDark ? Colors.black.withAlpha(20) : Colors.white.withAlpha(150),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Column(
-                              children: [
-                                Text(
-                                  'Coverage Breakdown',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: textSecondary,
+                              if (answer.isNotEmpty) ...[
+                                const SizedBox(height: 10),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? Colors.white.withAlpha(10) : Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: isDark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB),
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                  children: [
-                                    _buildBreakdownStat('Covered', coverageBreakdown['covered'] ?? 0, successGreen),
-                                    _buildBreakdownStat('Partial', coverageBreakdown['partiallyCovered'] ?? 0, warningAmber),
-                                    _buildBreakdownStat('Not Covered', coverageBreakdown['notCovered'] ?? 0, dangerRed),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 20),
-                        Text(
-                          summaryText,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: textSecondary,
-                            height: 1.6,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-                  const SizedBox(height: 24),
-
-                  if (!isInvalid) ...[
-                    // ─── Policy Summary ───
-                    if (policyJson.isNotEmpty)
-                      _buildInfoCard(
-                      isDark: isDark,
-                      theme: theme,
-                      title: 'Policy Summary',
-                      icon: Icons.policy_outlined,
-                      iconColor: primaryBlue,
-                      items: [
-                        _infoRow(isDark, 'Company', policyJson['insuranceCompany']),
-                        _infoRow(isDark, 'Policy', policyJson['policyName']),
-                        _infoRow(isDark, 'Number', policyJson['policyNumber']),
-                        _infoRow(isDark, 'Type', policyJson['policyType']),
-                        _infoRow(isDark, 'Coverage', policyJson['coverageAmount'] != null
-                            ? '₹${policyJson['coverageAmount']}'
-                            : null),
-                        _infoRow(isDark, 'Max Claim', policyJson['maximumClaimAmount'] != null
-                            ? '₹${policyJson['maximumClaimAmount']}'
-                            : null),
-                      ],
-                    ),
-                  const SizedBox(height: 16),
-
-                  // ─── Prescription Summary ───
-                  if (prescriptionJson.isNotEmpty)
-                    _buildInfoCard(
-                      isDark: isDark,
-                      theme: theme,
-                      title: 'Prescription Summary',
-                      icon: Icons.medical_information_outlined,
-                      iconColor: const Color(0xFF7C3AED),
-                      items: [
-                        _infoRow(isDark, 'Patient', prescriptionJson['patientName']),
-                        _infoRow(isDark, 'Hospital', prescriptionJson['hospitalName']),
-                        _infoRow(isDark, 'Doctor', prescriptionJson['doctorName']),
-                        _infoRow(isDark, 'Diagnosis', prescriptionJson['diagnosis']),
-                        _infoRow(isDark, 'Hospitalization',
-                            prescriptionJson['hospitalizationRequired'] == true
-                                ? 'Required'
-                                : prescriptionJson['hospitalizationRequired'] == false
-                                    ? 'Not Required'
-                                    : null),
-                        _infoRow(isDark, 'Est. Cost',
-                            prescriptionJson['estimatedTreatmentCost'] != null
-                                ? '₹${prescriptionJson['estimatedTreatmentCost']}'
-                                : null),
-                      ],
-                    ),
-                  const SizedBox(height: 24),
-
-                  // ─── Coverage Distribution Donut Chart ───
-                  CoverageDonutChart(
-                    coverageBreakdown: coverageBreakdown,
-                    isPolicyValid: isPolicyValid,
-                    isPrescriptionValid: isPrescriptionValid,
-                  ),
-
-                  // ─── Comparison Table ───
-                  if (comparison.isNotEmpty) ...[
-                    Text(
-                      'Coverage Comparison',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: textColor,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: theme.cardTheme.color ?? theme.cardColor,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
-                      ),
-                      child: Column(
-                        children: [
-                          // Table Header
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 14),
-                            child: Row(
-                              children: const [
-                                Expanded(
-                                  flex: 2,
-                                  child: Text('ITEM',
-                                      style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
-                                          color: Color(0xFF6B7280))),
-                                ),
-                                Expanded(
-                                  flex: 1,
-                                  child: Center(
-                                    child: Text('COST',
-                                        style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700,
-                                            color: Color(0xFF6B7280))),
-                                  ),
-                                ),
-                                Expanded(
-                                  flex: 2,
-                                  child: Align(
-                                    alignment: Alignment.centerRight,
-                                    child: Text('STATUS',
-                                        style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700,
-                                            color: Color(0xFF6B7280))),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Divider(height: 1, color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
-                          ...comparison.map((item) {
-                            final isCovered = item['isCovered'] == true;
-                            return Column(
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 16),
                                   child: Row(
                                     children: [
+                                      const Icon(Icons.person_outline, size: 16, color: Color(0xFF6B7280)),
+                                      const SizedBox(width: 8),
                                       Expanded(
-                                        flex: 2,
                                         child: Text(
-                                          item['item'] ?? '',
+                                          answer,
                                           style: TextStyle(
-                                            fontSize: 14,
+                                            fontSize: 13,
                                             fontWeight: FontWeight.w600,
-                                            color: textColor,
-                                          ),
-                                        ),
-                                      ),
-                                      Expanded(
-                                        flex: 1,
-                                        child: Center(
-                                          child: Text(
-                                            item['cost'] != null && item['cost'] != 0 
-                                                ? '₹${item['cost']}' 
-                                                : '-',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: textSecondary,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      Expanded(
-                                        flex: 2,
-                                        child: Align(
-                                          alignment: Alignment.centerRight,
-                                          child: Text(
-                                            item['status'] ?? '',
-                                            textAlign: TextAlign.right,
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w700,
-                                              color: isCovered
-                                                  ? successGreen
-                                                  : dangerRed,
-                                            ),
+                                            color: isDark ? Colors.white : const Color(0xFF111827),
                                           ),
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                if (comparison.last != item)
-                                  Divider(
-                                      height: 1, color: isDark ? Colors.grey.shade800 : Colors.grey.shade100),
                               ],
-                            );
-                          }),
-                        ],
-                      ),
+                            ],
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 12),
+                    ],
+
+                    // Coverage Distribution Donut Chart
+                    CoverageDonutChart(
+                      coverageBreakdown: coverageBreakdown,
+                      isPolicyValid: isPolicyValid,
+                      isPrescriptionValid: isPrescriptionValid,
                     ),
-                    const SizedBox(height: 24),
-                  ],
 
-                  // ─── Detailed Coverage Explanations ───
-                  if (comparison.isNotEmpty) ...[
-                    Text(
-                      'Coverage Decision Details',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: textColor,
+                    // Comparison Table
+                    if (comparison.isNotEmpty) ...[
+                      Text(
+                        'Coverage Comparison',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: textColor,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    ...comparison.map((item) {
-                      final status = (item['status'] ?? item['coverageStatus'] ?? 'Not Covered').toString();
-                      final isCovered = status == 'Covered';
-                      final isPartial = status == 'Partially Covered';
-
-                      Color itemColor;
-                      Color itemBg;
-                      Color itemBorder;
-                      IconData itemIcon;
-
-                      if (isCovered) {
-                        itemColor = successGreen;
-                        itemBg = isDark ? successGreen.withAlpha(15) : const Color(0xFFECFDF5);
-                        itemBorder = isDark ? successGreen.withAlpha(40) : const Color(0xFFA7F3D0);
-                        itemIcon = Icons.check_circle_outline;
-                      } else if (isPartial) {
-                        itemColor = warningAmber;
-                        itemBg = isDark ? warningAmber.withAlpha(15) : const Color(0xFFFFFBEB);
-                        itemBorder = isDark ? warningAmber.withAlpha(40) : const Color(0xFFFDE68A);
-                        itemIcon = Icons.rule_folder_outlined;
-                      } else {
-                        itemColor = dangerRed;
-                        itemBg = isDark ? dangerRed.withAlpha(15) : const Color(0xFFFEF2F2);
-                        itemBorder = isDark ? dangerRed.withAlpha(40) : const Color(0xFFFECACA);
-                        itemIcon = Icons.cancel_outlined;
-                      }
-
-                      final reason = (item['explanation'] ?? item['reason'] ?? item['coverageStatusReason'] ?? '').toString().trim();
-                      final policyEvidence = (item['policyEvidence'] ?? '').toString().trim();
-                      final financialDecision = (item['financialDecision'] ?? '').toString().trim();
-
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(16),
+                      const SizedBox(height: 12),
+                      Container(
                         decoration: BoxDecoration(
-                          color: itemBg,
+                          color: theme.cardTheme.color ?? theme.cardColor,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: itemBorder),
+                          border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
                         ),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                Icon(itemIcon, color: itemColor, size: 20),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    item['item'] ?? 'Unknown Item',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700,
-                                      color: textColor,
+                            // Table Header
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 14),
+                              child: Row(
+                                children: const [
+                                  Expanded(
+                                    flex: 2,
+                                    child: Text('ITEM',
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF6B7280))),
+                                  ),
+                                  Expanded(
+                                    flex: 1,
+                                    child: Center(
+                                      child: Text('COST',
+                                          style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                              color: Color(0xFF6B7280))),
                                     ),
                                   ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: itemColor.withAlpha(25),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: itemColor.withAlpha(60)),
-                                  ),
-                                  child: Text(
-                                    status,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: itemColor,
+                                  Expanded(
+                                    flex: 2,
+                                    child: Align(
+                                      alignment: Alignment.centerRight,
+                                      child: Text('STATUS',
+                                          style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                              color: Color(0xFF6B7280))),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                            if (reason.isNotEmpty) ...[
-                              const SizedBox(height: 10),
-                              Text(
-                                reason,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: textSecondary,
-                                  height: 1.45,
-                                ),
+                                ],
                               ),
-                            ],
-                            if (policyEvidence.isNotEmpty && policyEvidence != "No matching policy clause found.") ...[
-                              const SizedBox(height: 8),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                            ),
+                            Divider(height: 1, color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+                            ...comparison.map((item) {
+                              final isCovered = item['isCovered'] == true;
+                              return Column(
                                 children: [
-                                  Icon(Icons.gavel_outlined, size: 14, color: primaryBlue),
-                                  const SizedBox(width: 6),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 16),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          flex: 2,
+                                          child: Text(
+                                            item['item'] ?? '',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: textColor,
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 1,
+                                          child: Center(
+                                            child: Text(
+                                              item['cost'] != null && item['cost'] != 0 
+                                                  ? '₹${item['cost']}' 
+                                                  : '-',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                color: textSecondary,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Align(
+                                            alignment: Alignment.centerRight,
+                                            child: Text(
+                                              item['status'] ?? '',
+                                              textAlign: TextAlign.right,
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w700,
+                                                color: isCovered
+                                                    ? successGreen
+                                                    : dangerRed,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (comparison.last != item)
+                                    Divider(
+                                        height: 1, color: isDark ? Colors.grey.shade800 : Colors.grey.shade100),
+                                ],
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+
+                    // Detailed Coverage Explanations
+                    if (comparison.isNotEmpty) ...[
+                      Text(
+                        'Coverage Decision Details',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: textColor,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ...comparison.map((item) {
+                        final status = (item['status'] ?? item['coverageStatus'] ?? 'Not Covered').toString();
+                        final isCovered = status == 'Covered';
+                        final isPartial = status == 'Partially Covered';
+
+                        Color itemColor;
+                        Color itemBg;
+                        Color itemBorder;
+                        IconData itemIcon;
+
+                        if (isCovered) {
+                          itemColor = successGreen;
+                          itemBg = isDark ? successGreen.withAlpha(15) : const Color(0xFFECFDF5);
+                          itemBorder = isDark ? successGreen.withAlpha(40) : const Color(0xFFA7F3D0);
+                          itemIcon = Icons.check_circle_outline;
+                        } else if (isPartial) {
+                          itemColor = warningAmber;
+                          itemBg = isDark ? warningAmber.withAlpha(15) : const Color(0xFFFFFBEB);
+                          itemBorder = isDark ? warningAmber.withAlpha(40) : const Color(0xFFFDE68A);
+                          itemIcon = Icons.rule_folder_outlined;
+                        } else {
+                          itemColor = dangerRed;
+                          itemBg = isDark ? dangerRed.withAlpha(15) : const Color(0xFFFEF2F2);
+                          itemBorder = isDark ? dangerRed.withAlpha(40) : const Color(0xFFFECACA);
+                          itemIcon = Icons.cancel_outlined;
+                        }
+
+                        final reason = (item['explanation'] ?? item['reason'] ?? item['coverageStatusReason'] ?? '').toString().trim();
+                        final policyEvidence = (item['policyEvidence'] ?? '').toString().trim();
+                        final financialDecision = (item['financialDecision'] ?? '').toString().trim();
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: itemBg,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: itemBorder),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(itemIcon, color: itemColor, size: 20),
+                                  const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      'Policy Evidence: $policyEvidence',
+                                      item['item'] ?? 'Unknown Item',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                        color: textColor,
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: itemColor.withAlpha(25),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: itemColor.withAlpha(60)),
+                                    ),
+                                    child: Text(
+                                      status,
                                       style: TextStyle(
                                         fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: primaryBlue,
+                                        fontWeight: FontWeight.w700,
+                                        color: itemColor,
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
-                            ],
-                            if (financialDecision.isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              Text(
-                                'Financial Note: $financialDecision',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontStyle: FontStyle.italic,
-                                  color: textSecondary,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      );
-                    }),
-                    const SizedBox(height: 24),
-                  ],
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFFDE68A)),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.error_outline,
-                            color: Color(0xFFD97706), size: 24),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: RichText(
-                            text: const TextSpan(
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF92400E),
-                                height: 1.5,
-                              ),
-                              children: [
-                                TextSpan(
-                                  text: 'Disclaimer: ',
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.w700),
-                                ),
-                                TextSpan(
-                                  text:
-                                      'This is a system-generated reference. It does not guarantee approval. Final decisions rest with your insurance provider.',
+                              if (reason.isNotEmpty) ...[
+                                const SizedBox(height: 10),
+                                Text(
+                                  reason,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: textSecondary,
+                                    height: 1.45,
+                                  ),
                                 ),
                               ],
+                              if (policyEvidence.isNotEmpty && policyEvidence != "No matching policy clause found.") ...[
+                                const SizedBox(height: 8),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(Icons.gavel_outlined, size: 14, color: primaryBlue),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'Policy Evidence: $policyEvidence',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: primaryBlue,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                              if (financialDecision.isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Financial Note: $financialDecision',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontStyle: FontStyle.italic,
+                                    color: textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 24),
+                    ],
+
+                    // Standard Disclaimer
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.error_outline,
+                              color: Color(0xFFD97706), size: 24),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: RichText(
+                              text: const TextSpan(
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF92400E),
+                                  height: 1.5,
+                                ),
+                                children: [
+                                  TextSpan(
+                                    text: 'Disclaimer: ',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.w700),
+                                  ),
+                                  TextSpan(
+                                    text:
+                                        'This is a system-generated reference. It does not guarantee approval. Final decisions rest with your insurance provider.',
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  ], // End of !isInvalid check
+                  ],
                   
                   const SizedBox(height: 32),
 
@@ -717,7 +1012,10 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                       ],
                     ),
                     child: ElevatedButton(
-                      onPressed: () => context.go('/dashboard'),
+                      onPressed: () {
+                        ref.invalidate(dashboardStatsProvider);
+                        context.go('/dashboard');
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: isDark ? const Color(0xFF374151) : primaryBlue,
                         foregroundColor: Colors.white,
@@ -743,6 +1041,24 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
         );
       },
       ),
+    );
+  }
+
+  // ─── Helper: Section Title Row ───
+  Widget _buildSectionTitle(String title, IconData icon, Color iconColor, bool isDark, Color textColor) {
+    return Row(
+      children: [
+        Icon(icon, color: iconColor, size: 20),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: textColor,
+          ),
+        ),
+      ],
     );
   }
 

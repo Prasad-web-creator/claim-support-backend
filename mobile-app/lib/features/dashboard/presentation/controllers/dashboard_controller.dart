@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:claimsupport/core/providers.dart';
 import 'package:claimsupport/features/dashboard/data/models/dashboard_stats.dart';
 
-final dashboardStatsProvider = AsyncNotifierProvider<DashboardStatsNotifier, DashboardStats>(() {
+final dashboardStatsProvider = AsyncNotifierProvider.autoDispose<DashboardStatsNotifier, DashboardStats>(() {
   return DashboardStatsNotifier();
 });
 

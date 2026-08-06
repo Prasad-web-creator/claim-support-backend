@@ -4,7 +4,7 @@ import 'package:claimsupport/core/providers.dart';
 import 'package:claimsupport/features/policies/data/models/policy.dart';
 import 'package:claimsupport/core/models/pagination_response.dart';
 
-final policiesProvider = AsyncNotifierProvider<PoliciesNotifier, PaginationResponse<Policy>>(() {
+final policiesProvider = AsyncNotifierProvider.autoDispose<PoliciesNotifier, PaginationResponse<Policy>>(() {
   return PoliciesNotifier();
 });
 
@@ -73,6 +73,17 @@ class PoliciesNotifier extends AsyncNotifier<PaginationResponse<Policy>> {
     try {
       final repository = ref.read(policyRepositoryProvider);
       await repository.deletePolicy(id);
+      fetchPolicies(isRefresh: true);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> deletePolicies(List<String> ids) async {
+    if (ids.isEmpty) return;
+    try {
+      final repository = ref.read(policyRepositoryProvider);
+      await repository.deleteBatchPolicies(ids);
       fetchPolicies(isRefresh: true);
     } catch (e) {
       rethrow;

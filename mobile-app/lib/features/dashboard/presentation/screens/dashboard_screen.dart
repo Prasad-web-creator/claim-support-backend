@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:claimsupport/features/dashboard/presentation/controllers/dashboard_controller.dart';
+import 'package:claimsupport/features/policies/presentation/controllers/policy_controller.dart';
+import 'package:claimsupport/features/prescriptions/presentation/controllers/prescription_controller.dart';
 import 'package:claimsupport/features/authentication/presentation/controllers/auth_controller.dart';
 import 'package:claimsupport/features/analysis_reports/data/models/analysis_report.dart';
 import 'package:intl/intl.dart';
@@ -187,7 +189,11 @@ class DashboardScreen extends ConsumerWidget {
                                     iconBgColor: const Color(0xFFEFF6FF),
                                     count: stats.totalPolicies.toString(),
                                     label: 'POLICIES',
-                                    onTap: () => context.push('/policies'),
+                                    onTap: () async {
+                                      ref.invalidate(policiesProvider);
+                                      await context.push('/policies');
+                                      ref.invalidate(dashboardStatsProvider);
+                                    },
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -199,7 +205,11 @@ class DashboardScreen extends ConsumerWidget {
                                     iconBgColor: const Color(0xFFF3E8FF),
                                     count: stats.totalPrescriptions.toString(),
                                     label: 'PRESCRIPTIONS',
-                                    onTap: () => context.push('/prescriptions'),
+                                    onTap: () async {
+                                      ref.invalidate(prescriptionProvider);
+                                      await context.push('/prescriptions');
+                                      ref.invalidate(dashboardStatsProvider);
+                                    },
                                   ),
                                 ),
                               ],
@@ -240,7 +250,7 @@ class DashboardScreen extends ConsumerWidget {
                                 ),
                               )
                             else
-                              ...stats.recentAnalyses.map((report) => _buildRecentAnalysisCard(context, report)),
+                              ...stats.recentAnalyses.map((report) => _buildRecentAnalysisCard(context, ref, report)),
                           ],
                         );
                       },
@@ -324,7 +334,7 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildRecentAnalysisCard(BuildContext context, AnalysisReport report) {
+  Widget _buildRecentAnalysisCard(BuildContext context, WidgetRef ref, AnalysisReport report) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     
@@ -350,7 +360,10 @@ class DashboardScreen extends ConsumerWidget {
     }
 
     return InkWell(
-      onTap: () => context.push('/summary/${report.id}'),
+      onTap: () async {
+        await context.push('/summary/${report.id}');
+        ref.invalidate(dashboardStatsProvider);
+      },
       borderRadius: BorderRadius.circular(16),
       child: Card(
         margin: const EdgeInsets.only(bottom: 12),
