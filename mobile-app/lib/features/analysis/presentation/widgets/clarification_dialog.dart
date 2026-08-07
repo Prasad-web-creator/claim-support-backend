@@ -287,14 +287,14 @@ class ClarificationDialog extends StatefulWidget {
   final VoidCallback onCancel;
 
   const ClarificationDialog({
-    Key? key,
+    super.key,
     required this.clarificationData,
     required this.onSubmit,
     required this.onCancel,
-  }) : super(key: key);
+  });
 
   @override
-  _ClarificationDialogState createState() => _ClarificationDialogState();
+  State<ClarificationDialog> createState() => _ClarificationDialogState();
 }
 
 class _ClarificationDialogState extends State<ClarificationDialog> {

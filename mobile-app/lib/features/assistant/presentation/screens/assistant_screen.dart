@@ -85,7 +85,7 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                   return const Text('No uploaded policies found.', style: TextStyle(fontStyle: FontStyle.italic));
                 }
                 return DropdownButtonFormField<String>(
-                  value: _selectedPolicyId,
+                  initialValue: _selectedPolicyId,
                   hint: const Text('Choose a policy...'),
                   isExpanded: true,
                   decoration: InputDecoration(
@@ -94,8 +94,8 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                     fillColor: isDark ? Colors.grey.shade900 : Colors.grey.shade50,
                   ),
                   items: data.docs.map((policy) {
-                    final name = policy.policyName ?? 'Unknown Policy';
-                    final company = policy.insuranceCompany ?? 'Unknown Company';
+                    final name = policy.policyName.isNotEmpty ? policy.policyName : 'Unknown Policy';
+                    final company = policy.insuranceCompany.isNotEmpty ? policy.insuranceCompany : 'Unknown Company';
                     return DropdownMenuItem(
                       value: policy.id,
                       child: Text('$name ($company)'),
@@ -120,7 +120,7 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                   return const Text('No uploaded prescriptions found.', style: TextStyle(fontStyle: FontStyle.italic));
                 }
                 return DropdownButtonFormField<String>(
-                  value: _selectedPrescriptionId,
+                  initialValue: _selectedPrescriptionId,
                   hint: const Text('Choose a prescription...'),
                   isExpanded: true,
                   decoration: InputDecoration(
@@ -129,8 +129,8 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                     fillColor: isDark ? Colors.grey.shade900 : Colors.grey.shade50,
                   ),
                   items: data.docs.map((rx) {
-                    final hospital = rx.hospitalName ?? 'Unknown Hospital';
-                    final doctor = rx.doctorName ?? 'Unknown Doctor';
+                    final hospital = rx.hospitalName.isNotEmpty ? rx.hospitalName : 'Unknown Hospital';
+                    final doctor = rx.doctorName.isNotEmpty ? rx.doctorName : 'Unknown Doctor';
                     return DropdownMenuItem(
                       value: rx.id,
                       child: Text('$hospital - $doctor'),

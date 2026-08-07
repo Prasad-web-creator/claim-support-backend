@@ -22,6 +22,8 @@ class AnalysisNotifier extends Notifier<AsyncValue<Map<String, dynamic>>> {
   CancelToken? _cancelToken;
   AnalysisParams? _params;
 
+  AnalysisParams? get params => _params;
+
   @override
   AsyncValue<Map<String, dynamic>> build() {
     return const AsyncValue.loading();

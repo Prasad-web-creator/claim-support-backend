@@ -16,15 +16,23 @@ class ThemeNotifier extends Notifier<ThemeMode> {
   }
 
   Future<void> _loadTheme() async {
-    final prefs = SharedPrefs.instance;
-    final isDark = prefs.getBool(_themeKey) ?? false;
-    state = isDark ? ThemeMode.dark : ThemeMode.light;
+    try {
+      final prefs = await SharedPrefs.getAsync();
+      final isDark = prefs.getBool(_themeKey) ?? false;
+      state = isDark ? ThemeMode.dark : ThemeMode.light;
+    } catch (e) {
+      debugPrint('[ThemeNotifier] Error loading theme: $e');
+    }
   }
 
   Future<void> toggleTheme() async {
     final isDark = state == ThemeMode.light;
     state = isDark ? ThemeMode.dark : ThemeMode.light;
-    final prefs = SharedPrefs.instance;
-    await prefs.setBool(_themeKey, isDark);
+    try {
+      final prefs = await SharedPrefs.getAsync();
+      await prefs.setBool(_themeKey, isDark);
+    } catch (e) {
+      debugPrint('[ThemeNotifier] Error saving theme: $e');
+    }
   }
 }

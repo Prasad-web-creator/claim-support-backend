@@ -7,12 +7,23 @@ enum Environment {
 }
 
 class EnvConfig {
-  static late Environment _environment;
-  static late String _apiBaseUrl;
+  static Environment _environment = kReleaseMode ? Environment.prod : Environment.dev;
+  static String _apiBaseUrl = kReleaseMode
+      ? const String.fromEnvironment(
+          'API_BASE_URL',
+          defaultValue: 'https://claim-support-backend-python-production.up.railway.app/api',
+        )
+      : const String.fromEnvironment(
+          'API_BASE_URL',
+          defaultValue: 'http://10.71.14.1:8000/api',
+        );
 
   static void initialize(Environment env) {
     _environment = env;
-    final envFileUrl = dotenv.env['API_BASE_URL'];
+    String? envFileUrl;
+    try {
+      envFileUrl = dotenv.env['API_BASE_URL'];
+    } catch (_) {}
 
     switch (env) {
       case Environment.prod:
