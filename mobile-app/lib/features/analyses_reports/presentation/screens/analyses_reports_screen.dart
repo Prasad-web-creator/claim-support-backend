@@ -203,7 +203,8 @@ class _AnalysesReportsScreenState extends ConsumerState<AnalysesReportsScreen> {
               Expanded(
                 child: reportState.when(
                   data: (pagination) {
-                    final reports = pagination.docs;
+                    final reports = List<AnalysisReport>.from(pagination.docs)
+                      ..sort((a, b) => (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)));
                     if (reports.isEmpty) {
                       return const Center(
                         child: Text('No analysis reports found.'),
@@ -228,9 +229,11 @@ class _AnalysesReportsScreenState extends ConsumerState<AnalysesReportsScreen> {
                           final report = reports[index];
                           final reportId = report.id;
                           final isSelected = _selectedReportIds.contains(reportId);
-                          final reportNumber = report.reportNumber != null ? 'CR-${report.reportNumber!.toString().padLeft(4, '0')}' : 'Unknown';
-                          final policyName = report.policyMetadata?['plan_name'] ?? report.policyMetadata?['policy_type'] ?? report.policyMetadata?['insurance_company'] ?? 'Unknown Policy';
-                          final patientName = report.prescriptionMetadata?['patient_name'] ?? 'Unknown Patient';
+                          final reportNumber = report.reportNumber != null ? 'CR-${report.reportNumber!.toString().padLeft(4, '0')}' : null;
+                          final rawPolicyName = (report.policyMetadata?['plan_name'] ?? report.policyMetadata?['policy_type'] ?? report.policyMetadata?['insurance_company'])?.toString().trim();
+                          final policyName = (rawPolicyName != null && rawPolicyName.isNotEmpty && !rawPolicyName.toLowerCase().startsWith('unknown') && rawPolicyName.toLowerCase() != 'none') ? rawPolicyName : null;
+                          final rawPatientName = report.prescriptionMetadata?['patient_name'] ?? report.prescriptionMetadata?['patientName'];
+                          final patientName = (rawPatientName != null && rawPatientName.toString().trim().isNotEmpty && !rawPatientName.toString().toLowerCase().startsWith('unknown') && rawPatientName.toString().toLowerCase() != 'none') ? rawPatientName.toString().trim() : null;
                           final status = report.overallStatus ?? 'Pending';
                           
                           Color statusColor = Colors.grey;
@@ -244,15 +247,15 @@ class _AnalysesReportsScreenState extends ConsumerState<AnalysesReportsScreen> {
 
                           final dominance = report.dominanceScore != null
                               ? '${report.dominanceScore}%'
-                              : 'N/A';
+                              : null;
 
                           final dateStr = report.createdAt != null
                               ? DateFormat('dd-MM-yyyy h:mm a').format(report.createdAt!.toLocal())
-                              : 'Unknown Date';
+                              : null;
                               
                           final analyzedTime = report.processingTimeMs != null 
                               ? '${(report.processingTimeMs! / 1000).toStringAsFixed(1)}s'
-                              : 'N/A';
+                              : null;
 
                           return Card(
                             elevation: 0,
@@ -305,7 +308,7 @@ class _AnalysesReportsScreenState extends ConsumerState<AnalysesReportsScreen> {
                                         children: [
                                           Row(
                                             children: [
-                                              Text(reportNumber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                              Text(reportNumber ?? 'Report Analysis', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                                               const Spacer(),
                                               Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -325,17 +328,17 @@ class _AnalysesReportsScreenState extends ConsumerState<AnalysesReportsScreen> {
                                                   icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 22),
                                                   padding: EdgeInsets.zero,
                                                   constraints: const BoxConstraints(),
-                                                  onPressed: () => _confirmDeleteSingle(reportId, reportNumber),
+                                                  onPressed: () => _confirmDeleteSingle(reportId, reportNumber ?? 'Report'),
                                                 ),
                                               ],
                                             ],
                                           ),
                                           const SizedBox(height: 8),
-                                          _buildTextRow('Policy Name', policyName, isDark: isDark),
-                                          _buildTextRow('Patient Name', patientName, isDark: isDark),
-                                          _buildTextRow('Dominance score', dominance, isDark: isDark),
-                                          _buildTextRow('Analyzed DateTime', dateStr, isDark: isDark),
-                                          _buildTextRow('Analyzed time', analyzedTime, isDark: isDark),
+                                          if (policyName != null) _buildTextRow('Policy Name', policyName, isDark: isDark),
+                                          if (patientName != null) _buildTextRow('Patient Name', patientName, isDark: isDark),
+                                          if (dominance != null) _buildTextRow('Dominance score', dominance, isDark: isDark),
+                                          if (dateStr != null) _buildTextRow('Analyzed DateTime', dateStr, isDark: isDark),
+                                          if (analyzedTime != null) _buildTextRow('Analyzed time', analyzedTime, isDark: isDark),
                                         ],
                                       ),
                                     ),
@@ -359,7 +362,10 @@ class _AnalysesReportsScreenState extends ConsumerState<AnalysesReportsScreen> {
     );
   }
 
-  Widget _buildTextRow(String? label, String value, {Color? color, bool isDark = false}) {
+  Widget _buildTextRow(String? label, String? value, {Color? color, bool isDark = false}) {
+    if (value == null || value.trim().isEmpty || value.trim() == '---' || value.trim() == 'N/A') {
+      return const SizedBox.shrink();
+    }
     final defaultColor = isDark ? Colors.grey.shade300 : Colors.black87;
     return Padding(
       padding: const EdgeInsets.only(bottom: 6.0),

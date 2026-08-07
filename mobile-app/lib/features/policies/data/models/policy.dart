@@ -47,11 +47,19 @@ class Policy {
   factory Policy.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic val) {
       if (val == null) return null;
-      if (val is DateTime) return val;
+      if (val is DateTime) return val.isUtc ? val.toLocal() : val;
       final str = val.toString().trim();
       if (str.isEmpty || str.toLowerCase() == 'null') return null;
-      final dt = DateTime.tryParse(str);
-      if (dt != null) return dt;
+
+      String parseableStr = str;
+      if (str.contains('T') && !str.endsWith('Z') && !str.contains('+')) {
+        parseableStr = '${str}Z';
+      }
+
+      final dt = DateTime.tryParse(parseableStr) ?? DateTime.tryParse(str);
+      if (dt != null) {
+        return dt.toLocal();
+      }
       
       final slashParts = str.split('/');
       if (slashParts.length == 3) {

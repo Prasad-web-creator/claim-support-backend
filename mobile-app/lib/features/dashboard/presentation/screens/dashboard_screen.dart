@@ -6,6 +6,8 @@ import 'package:claimsupport/features/policies/presentation/controllers/policy_c
 import 'package:claimsupport/features/prescriptions/presentation/controllers/prescription_controller.dart';
 import 'package:claimsupport/features/authentication/presentation/controllers/auth_controller.dart';
 import 'package:claimsupport/features/analysis_reports/data/models/analysis_report.dart';
+import 'package:claimsupport/features/dashboard/presentation/widgets/sliding_banner.dart';
+import 'package:claimsupport/features/dashboard/presentation/widgets/floating_live_ad.dart';
 import 'package:intl/intl.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -22,11 +24,13 @@ class DashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () async {
-            await ref.read(dashboardStatsProvider.notifier).fetchStats();
-          },
+      body: Stack(
+        children: [
+          SafeArea(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                await ref.read(dashboardStatsProvider.notifier).fetchStats();
+              },
           child: SingleChildScrollView(
             physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
             child: Center(
@@ -158,7 +162,12 @@ class DashboardScreen extends ConsumerWidget {
                   ),
                 ),
 
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
+
+                // Sliding Offer & Promotion Banner
+                const SlidingBanner(),
+
+                const SizedBox(height: 28),
 
                 // Quick Stats Header
                 Text(
@@ -266,6 +275,11 @@ class DashboardScreen extends ConsumerWidget {
       ),
           ),
         ),
+      ),
+
+          // Draggable Flipkart-style Floating Live Ad Widget
+          const FloatingLiveAd(),
+        ],
       ),
     );
   }

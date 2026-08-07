@@ -10,7 +10,6 @@ import 'package:claimsupport/features/upload/presentation/screens/upload_policy_
 import 'package:claimsupport/features/analysis/presentation/screens/consent_screen.dart';
 import 'package:claimsupport/features/analysis/presentation/screens/analysis_screen.dart';
 import 'package:claimsupport/features/summary/presentation/screens/summary_screen.dart';
-import 'package:claimsupport/features/assistant/presentation/screens/assistant_screen.dart';
 import 'package:claimsupport/features/analyses_reports/presentation/screens/analyses_reports_screen.dart';
 import 'package:claimsupport/features/profile/presentation/screens/profile_screen.dart';
 import 'package:claimsupport/features/policies/presentation/screens/policy_list_screen.dart';
@@ -65,75 +64,49 @@ class AppRouter {
               final isDark = theme.brightness == Brightness.dark;
               return Scaffold(
                 backgroundColor: theme.scaffoldBackgroundColor,
-            body: child,
-            floatingActionButton: Container(
-              height: 64,
-              width: 64,
-              margin: const EdgeInsets.only(top: 30),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF2563EB).withAlpha(60),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
+                body: child,
+                bottomNavigationBar: BottomAppBar(
+                  color: isDark ? const Color(0xFF1F2937) : Colors.white,
+                  surfaceTintColor: Colors.transparent,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _NavBarItem(
+                        icon: Icons.home_outlined,
+                        activeIcon: Icons.home,
+                        label: 'Home',
+                        isSelected: _calculateSelectedIndex(state.uri.path) == 0,
+                        isDark: isDark,
+                        onTap: () => _onItemTapped(0, context, ref),
+                      ),
+                      _NavBarItem(
+                        icon: Icons.description_outlined,
+                        activeIcon: Icons.description,
+                        label: 'Reports',
+                        isSelected: _calculateSelectedIndex(state.uri.path) == 1,
+                        isDark: isDark,
+                        onTap: () => _onItemTapped(1, context, ref),
+                      ),
+                      _NavBarItem(
+                        icon: Icons.history_outlined,
+                        activeIcon: Icons.history,
+                        label: 'Logs',
+                        isSelected: _calculateSelectedIndex(state.uri.path) == 2,
+                        isDark: isDark,
+                        onTap: () => _onItemTapped(2, context, ref),
+                      ),
+                      _NavBarItem(
+                        icon: Icons.person_outline,
+                        activeIcon: Icons.person,
+                        label: 'Profile',
+                        isSelected: _calculateSelectedIndex(state.uri.path) == 3,
+                        isDark: isDark,
+                        onTap: () => _onItemTapped(3, context, ref),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: FloatingActionButton(
-                onPressed: () => context.push('/consent'),
-                backgroundColor: const Color(0xFF2563EB),
-                elevation: 0,
-                shape: const CircleBorder(),
-                child: const Icon(Icons.cloud_upload_outlined, color: Colors.white, size: 28),
-              ),
-            ),
-            floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-            bottomNavigationBar: BottomAppBar(
-              color: isDark ? const Color(0xFF1F2937) : Colors.white,
-              surfaceTintColor: Colors.transparent,
-              shape: const CircularNotchedRectangle(),
-              notchMargin: 8,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _NavBarItem(
-                    icon: Icons.home_outlined,
-                    activeIcon: Icons.home,
-                    label: 'Home',
-                    isSelected: _calculateSelectedIndex(state.uri.path) == 0,
-                    isDark: isDark,
-                    onTap: () => _onItemTapped(0, context, ref),
-                  ),
-                  _NavBarItem(
-                    icon: Icons.description_outlined,
-                    activeIcon: Icons.description,
-                    label: 'Reports',
-                    isSelected: _calculateSelectedIndex(state.uri.path) == 1,
-                    isDark: isDark,
-                    onTap: () => _onItemTapped(1, context, ref),
-                  ),
-                  const SizedBox(width: 48), // Space for FAB
-                  _NavBarItem(
-                    icon: Icons.history_outlined,
-                    activeIcon: Icons.history,
-                    label: 'Logs',
-                    isSelected: _calculateSelectedIndex(state.uri.path) == 2,
-                    isDark: isDark,
-                    onTap: () => _onItemTapped(2, context, ref),
-                  ),
-                  _NavBarItem(
-                    icon: Icons.person_outline,
-                    activeIcon: Icons.person,
-                    label: 'Profile',
-                    isSelected: _calculateSelectedIndex(state.uri.path) == 3,
-                    isDark: isDark,
-                    onTap: () => _onItemTapped(3, context, ref),
-                  ),
-                ],
-              ),
-            ),
-          ); // Closes Scaffold
+                ),
+              ); // Closes Scaffold
             },
           ); // Closes Consumer
         },
@@ -145,10 +118,6 @@ class AppRouter {
           GoRoute(
             path: '/reports',
             builder: (context, state) => const AnalysesReportsScreen(),
-          ),
-          GoRoute(
-            path: '/assistant',
-            builder: (context, state) => const AssistantScreen(),
           ),
           GoRoute(
             path: '/upload',

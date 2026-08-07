@@ -182,7 +182,30 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
           invalidDisclaimer = 'The uploaded Policy document could not be analyzed because it is invalid, unreadable, or unsupported. Please ensure you upload a valid health insurance policy document (PDF, JPG, PNG) and try again.';
         } else if (!isPrescriptionValid) {
           invalidStatusTitle = 'Invalid Prescription';
-          invalidDisclaimer = 'The uploaded Prescription document could not be analyzed because it is invalid, unreadable, or unsupported. Please ensure you upload a valid medical prescription document (PDF, JPG, PNG) and try again.';
+          if (isManualRx) {
+            invalidDisclaimer = 'The self-entered prescription is not valid. Please provide valid medical details (such as diagnosis, symptoms, diseases, medicines, or medical tests) and try again.';
+          } else {
+            invalidDisclaimer = 'The uploaded Prescription document could not be analyzed because it is invalid, unreadable, or unsupported. Please ensure you upload a valid medical prescription document (PDF, JPG, PNG) and try again.';
+          }
+        }
+
+        final Map<String, dynamic>? docMap = docValidity ??
+            ((data['coverageAnalysis'] is Map)
+                ? (data['coverageAnalysis']['documentValidity'] as Map<String, dynamic>?)
+                : null);
+
+        String rxInvalidReasonText = docMap?['prescriptionInvalidReason']?.toString() ?? '';
+        if (rxInvalidReasonText.isEmpty) {
+          if (isManualRx) {
+            rxInvalidReasonText = 'The self-entered text contains no recognizable medical details (no diagnosis, symptoms, diseases, medicines, or medical tests).';
+          } else {
+            rxInvalidReasonText = 'The uploaded document contains no valid diagnosis, medicines, medical tests, procedures, or symptoms.';
+          }
+        }
+
+        String policyInvalidReasonText = docMap?['policyInvalidReason']?.toString() ?? '';
+        if (policyInvalidReasonText.isEmpty) {
+          policyInvalidReasonText = 'The uploaded policy document contains no recognizable insurance policy clauses, covered treatments, benefit rules, or insurance terms.';
         }
 
         // Determine status color for valid summary
@@ -352,7 +375,9 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              invalidDisclaimer,
+                              (data['summary'] != null && data['summary'].toString().trim().isNotEmpty && (data['summary'].toString().toLowerCase().contains('invalid') || data['summary'].toString().toLowerCase().contains('self-entered') || data['summary'].toString().toLowerCase().contains('uploaded')))
+                                  ? data['summary'].toString()
+                                  : invalidDisclaimer,
                               style: TextStyle(
                                 fontSize: 14,
                                 color: isDark ? Colors.grey.shade300 : const Color(0xFF92400E),
@@ -361,6 +386,152 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                               ),
                             ),
                           ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ─── NEW CARD: Validation Failure Reasons ───
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isDark ? dangerRed.withAlpha(40) : const Color(0xFFFCA5A5),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withAlpha(isDark ? 30 : 10),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: dangerRed.withAlpha(20),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.error_outline_rounded,
+                                  color: dangerRed,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Validation Failure Reasons',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: textColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          // 1. Prescription Failure Reason Box
+                          if (!isPrescriptionValid) ...[
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFFEF2F2),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isDark ? dangerRed.withAlpha(40) : const Color(0xFFFECACA),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        isManualRx ? Icons.edit_note_rounded : Icons.receipt_long_rounded,
+                                        color: dangerRed,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        isManualRx ? 'Self-Entered Prescription Issue' : 'Uploaded Prescription Issue',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    rxInvalidReasonText,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: isDark ? Colors.grey.shade300 : const Color(0xFF7F1D1D),
+                                      height: 1.45,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (!isPolicyValid) const SizedBox(height: 12),
+                          ],
+
+                          // 2. Policy Failure Reason Box
+                          if (!isPolicyValid) ...[
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFFEF2F2),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isDark ? dangerRed.withAlpha(40) : const Color(0xFFFECACA),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.policy_rounded,
+                                        color: dangerRed,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Uploaded Policy Issue',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    policyInvalidReasonText,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: isDark ? Colors.grey.shade300 : const Color(0xFF7F1D1D),
+                                      height: 1.45,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -522,6 +693,36 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                               prescriptionJson['prescriptionSource'] == 'Self-entered Prescription' ||
                               (prescriptionJson['manualText'] != null && prescriptionJson['manualText'].toString().isNotEmpty);
 
+                          String? cleanValue(dynamic v) {
+                            if (v == null) return null;
+                            if (v is List) {
+                              final filtered = v
+                                  .map((e) => e.toString().trim())
+                                  .where((e) => e.isNotEmpty && e != '---' && e.toLowerCase() != 'none' && e.toLowerCase() != 'null' && !e.toLowerCase().startsWith('unknown'))
+                                  .toList();
+                              return filtered.isNotEmpty ? filtered.join(', ') : null;
+                            }
+                            final str = v.toString().trim();
+                            if (str.isEmpty || str == '---' || str == '[]' || str == '[ ]' || str.toLowerCase() == 'none' || str.toLowerCase() == 'null' || str.toLowerCase().startsWith('unknown')) {
+                              return null;
+                            }
+                            return str;
+                          }
+
+                          String? diag = cleanValue(prescriptionJson['diagnosis']);
+                          if (diag == null) {
+                            if (prescriptionJson['symptoms'] is List && (prescriptionJson['symptoms'] as List).isNotEmpty) {
+                              diag = (prescriptionJson['symptoms'] as List).map((e) => e.toString()).where((e) => e.isNotEmpty).join(', ');
+                            } else if (prescriptionJson['manualText'] != null) {
+                              diag = cleanValue(prescriptionJson['manualText']);
+                            }
+                          }
+
+                          String? symptomsStr;
+                          if (prescriptionJson['symptoms'] is List && (prescriptionJson['symptoms'] as List).isNotEmpty) {
+                            symptomsStr = (prescriptionJson['symptoms'] as List).map((e) => e.toString()).where((e) => e.isNotEmpty).join(', ');
+                          }
+
                           return _buildInfoCard(
                             isDark: isDark,
                             theme: theme,
@@ -558,11 +759,12 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                                     ),
                                   ),
                                 ),
-                              _infoRow(isDark, 'Patient', prescriptionJson['patientName']),
-                              _infoRow(isDark, 'Hospital', prescriptionJson['hospitalName']),
-                              _infoRow(isDark, 'Doctor', prescriptionJson['doctorName']),
-                              if (isManual)
-                                _infoRow(isDark, 'Diagnosis', prescriptionJson['diagnosis']),
+                              _infoRow(isDark, 'Patient', cleanValue(prescriptionJson['patientName'])),
+                              _infoRow(isDark, 'Hospital', cleanValue(prescriptionJson['hospitalName'])),
+                              _infoRow(isDark, 'Doctor', cleanValue(prescriptionJson['doctorName'])),
+                              _infoRow(isDark, 'Diagnosis', diag),
+                              if (symptomsStr != null && symptomsStr != diag)
+                                _infoRow(isDark, 'Symptoms', symptomsStr),
                               _infoRow(isDark, 'Hospitalization',
                                   prescriptionJson['hospitalizationRequired'] == true
                                       ? 'Required'
@@ -570,7 +772,7 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                                           ? 'Not Required'
                                           : null),
                               _infoRow(isDark, 'Est. Cost',
-                                  prescriptionJson['estimatedTreatmentCost'] != null
+                                  prescriptionJson['estimatedTreatmentCost'] != null && prescriptionJson['estimatedTreatmentCost'].toString() != '0'
                                       ? '₹${prescriptionJson['estimatedTreatmentCost']}'
                                       : null),
                             ],
@@ -1128,9 +1330,23 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
     );
   }
 
-  // ─── Helper: Info Row (returns null if value is null) ───
+  // ─── Helper: Info Row (returns null if value is missing so row is hidden) ───
   Widget? _infoRow(bool isDark, String label, dynamic value) {
-    if (value == null || value.toString().isEmpty) return null;
+    if (value == null) return null;
+    String displayVal = '';
+    if (value is List) {
+      final filtered = value
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty && e != '---' && e.toLowerCase() != 'none' && e.toLowerCase() != 'null' && !e.toLowerCase().startsWith('unknown'))
+          .toList();
+      if (filtered.isNotEmpty) displayVal = filtered.join(', ');
+    } else {
+      final str = value.toString().trim();
+      if (str.isNotEmpty && str != '---' && str != '[]' && str != '[ ]' && str.toLowerCase() != 'none' && str.toLowerCase() != 'null' && !str.toLowerCase().startsWith('unknown')) {
+        displayVal = str;
+      }
+    }
+    if (displayVal.isEmpty) return null;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -1147,7 +1363,7 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
           ),
           Expanded(
             child: Text(
-              value.toString(),
+              displayVal,
               style: TextStyle(
                 fontSize: 13,
                 color: isDark ? Colors.white : const Color(0xFF111827), 

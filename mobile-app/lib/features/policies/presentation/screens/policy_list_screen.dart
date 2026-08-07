@@ -202,7 +202,8 @@ class _PolicyListScreenState extends ConsumerState<PolicyListScreen> {
           Expanded(
             child: policyState.when(
               data: (pagination) {
-                final policies = pagination.docs;
+                final policies = List<Policy>.from(pagination.docs)
+                  ..sort((a, b) => (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)));
                 if (policies.isEmpty) {
                   return const Center(
                     child: Text('No policies found. Add one!'),
@@ -369,7 +370,7 @@ class _PolicyListScreenState extends ConsumerState<PolicyListScreen> {
                                           const SizedBox(height: 8),
 
                                           // Policy Holder Name
-                                          if (policy.policyHolderName != null && policy.policyHolderName!.trim().isNotEmpty) ...[
+                                          if (policy.policyHolderName != null && policy.policyHolderName!.trim().isNotEmpty && policy.policyHolderName != '---' && !policy.policyHolderName!.toLowerCase().startsWith('unknown')) ...[
                                             Row(
                                               children: [
                                                 Icon(Icons.person_outline, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
@@ -390,7 +391,7 @@ class _PolicyListScreenState extends ConsumerState<PolicyListScreen> {
                                           ],
 
                                           // Policy Number
-                                          if (policy.policyNumber.trim().isNotEmpty) ...[
+                                          if (policy.policyNumber.trim().isNotEmpty && policy.policyNumber != '---' && !policy.policyNumber.toLowerCase().startsWith('unknown')) ...[
                                             Row(
                                               children: [
                                                 Icon(Icons.tag, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
@@ -464,7 +465,7 @@ class _PolicyListScreenState extends ConsumerState<PolicyListScreen> {
                                           ],
 
                                           // Policy File Name
-                                          if (policy.originalFileName != null && policy.originalFileName!.trim().isNotEmpty) ...[
+                                          if (policy.originalFileName != null && policy.originalFileName!.trim().isNotEmpty && policy.originalFileName != '---') ...[
                                             Row(
                                               children: [
                                                 Icon(Icons.insert_drive_file_outlined, size: 14, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),

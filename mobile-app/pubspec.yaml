@@ -47,6 +47,7 @@ dependencies:
   intl: ^0.20.3
   flutter_dotenv: ^6.0.1
   flutter_secure_storage: ^10.3.1
+  url_launcher: ^6.3.1
   syncfusion_flutter_pdfviewer: ^33.2.13
 
 dev_dependencies:
@@ -80,6 +81,7 @@ flutter:
 
   assets:
     - .env
+    - assets/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

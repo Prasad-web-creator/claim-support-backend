@@ -1,3 +1,4 @@
+// ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'dart:developer' as developer;
 
@@ -61,24 +62,35 @@ class _SingleChoiceQuestionState extends State<_SingleChoiceQuestion> {
               borderRadius: BorderRadius.circular(12),
               child: Ink(
                 decoration: BoxDecoration(
-                  color: isSelected ? theme.colorScheme.primary.withOpacity(0.1) : surfaceColor,
+                  color: isSelected ? theme.colorScheme.primary.withAlpha(25) : surfaceColor,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: isSelected ? theme.colorScheme.primary : Colors.transparent,
                     width: 1.5,
                   ),
                 ),
-                child: RadioListTile<String>(
-                  dense: true,
-                  title: Text(optStr, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
-                  value: optStr,
-                  groupValue: _selected,
-                  activeColor: theme.colorScheme.primary,
-                  onChanged: (val) {
-                    setState(() => _selected = val);
-                    widget.onChanged(val);
-                    developer.log('[Clarification] Radio changed: $val for question ${widget.question['id']}');
-                  },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Row(
+                    children: [
+                      Radio<String>(
+                        value: optStr,
+                        groupValue: _selected,
+                        onChanged: (val) {
+                          setState(() => _selected = val);
+                          widget.onChanged(val);
+                          developer.log('[Clarification] Radio changed: $val for question ${widget.question['id']}');
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          optStr,
+                          style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -138,7 +150,7 @@ class _MultiChoiceQuestionState extends State<_MultiChoiceQuestion> {
             color: Colors.transparent,
             child: Ink(
               decoration: BoxDecoration(
-                color: isSelected ? theme.colorScheme.primary.withOpacity(0.1) : surfaceColor,
+                color: isSelected ? theme.colorScheme.primary.withAlpha(25) : surfaceColor,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: isSelected ? theme.colorScheme.primary : Colors.transparent,
@@ -212,7 +224,6 @@ class _BooleanQuestionState extends State<_BooleanQuestion> {
           dense: true,
           title: const Text('Yes / No', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
           value: _value,
-          activeColor: theme.colorScheme.primary,
           onChanged: (val) {
             setState(() => _value = val);
             widget.onChanged(val);
@@ -400,7 +411,7 @@ class _ClarificationDialogState extends State<ClarificationDialog> {
                   topRight: Radius.circular(20),
                 ),
                 border: Border(
-                  bottom: BorderSide(color: Colors.grey.withOpacity(0.15)),
+                  bottom: BorderSide(color: Colors.grey.withAlpha(38)),
                 ),
               ),
               child: Row(
@@ -408,7 +419,7 @@ class _ClarificationDialogState extends State<ClarificationDialog> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: primaryColor.withOpacity(0.12),
+                      color: primaryColor.withAlpha(31),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(Icons.help_outline_rounded, color: primaryColor, size: 22),
@@ -492,7 +503,7 @@ class _ClarificationDialogState extends State<ClarificationDialog> {
                                     q['question'] ?? '',
                                     style: TextStyle(
                                       fontSize: 13,
-                                      color: textColor.withOpacity(0.75),
+                                      color: textColor.withAlpha(191),
                                       height: 1.4,
                                     ),
                                   ),
@@ -501,9 +512,9 @@ class _ClarificationDialogState extends State<ClarificationDialog> {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                       decoration: BoxDecoration(
-                                        color: Colors.amber.withOpacity(0.1),
+                                        color: Colors.amber.withAlpha(25),
                                         borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                                        border: Border.all(color: Colors.amber.withAlpha(77)),
                                       ),
                                       child: Row(
                                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -547,7 +558,7 @@ class _ClarificationDialogState extends State<ClarificationDialog> {
             Container(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
               decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: Colors.grey.withOpacity(0.15))),
+                border: Border(top: BorderSide(color: Colors.grey.withAlpha(38))),
               ),
               child: Row(
                 children: [
@@ -560,7 +571,7 @@ class _ClarificationDialogState extends State<ClarificationDialog> {
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         foregroundColor: textSecondary,
-                        side: BorderSide(color: Colors.grey.withOpacity(0.4)),
+                        side: BorderSide(color: Colors.grey.withAlpha(102)),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -574,8 +585,8 @@ class _ClarificationDialogState extends State<ClarificationDialog> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         foregroundColor: Colors.white,
-                        disabledBackgroundColor: primaryColor.withOpacity(0.3),
-                        disabledForegroundColor: Colors.white.withOpacity(0.6),
+                        disabledBackgroundColor: primaryColor.withAlpha(77),
+                        disabledForegroundColor: Colors.white.withAlpha(153),
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

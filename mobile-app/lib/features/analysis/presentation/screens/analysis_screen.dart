@@ -402,10 +402,17 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen>
     final Color textSecondary = isDark ? Colors.grey.shade400 : const Color(0xFF6B7280);
     final Color successGreen = const Color(0xFF059669);
 
-    final prefs = SharedPrefs.instance;
-    final prescriptionPath = prefs.getString('prescription_path');
-    final policyPath = prefs.getString('policy_path');
-    final policyId = policyPath != null ? null : prefs.getString('policy_id');
+    String? prescriptionPath;
+    String? policyPath;
+    String? policyId;
+    try {
+      final prefs = SharedPrefs.instance;
+      prescriptionPath = prefs.getString('prescription_path');
+      policyPath = prefs.getString('policy_path');
+      policyId = policyPath != null ? null : prefs.getString('policy_id');
+    } catch (e) {
+      developer.log('[AnalysisScreen] SharedPrefs error in build: $e');
+    }
 
     if (prescriptionPath == null || (policyPath == null && policyId == null)) {
       return Scaffold(
@@ -432,8 +439,16 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen>
     // ── Handle state transitions via post-frame callbacks ───────────────
     analysisState.whenOrNull(
       data: (data) {
-        final status = data['status'] as String? ?? '';
-        developer.log('[AnalysisScreen] State data received. status=$status');
+        final status = (data['status'] as String? ?? '').toLowerCase();
+        final overallStatus = (data['overallStatus'] as String? ?? '').toLowerCase();
+        final isComplete = status == 'complete' ||
+            status == 'completed' ||
+            status == 'manual_review_required' ||
+            overallStatus.startsWith('invalid') ||
+            data.containsKey('documentValidity') ||
+            data.containsKey('overallStatus');
+
+        developer.log('[AnalysisScreen] State data received. status=$status, overallStatus=$overallStatus, isComplete=$isComplete');
 
         if (status == 'needs_clarification' && !_dialogShowing) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -441,10 +456,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen>
               _showClarificationDialog(data);
             }
           });
-        } else if ((status == 'complete' ||
-                status == 'completed' ||
-                status == 'manual_review_required') &&
-            !_navigatedToSummary) {
+        } else if (isComplete && !_navigatedToSummary) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted && !_navigatedToSummary) {
               _navigateToSummary(data);

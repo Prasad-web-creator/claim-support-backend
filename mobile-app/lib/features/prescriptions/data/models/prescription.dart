@@ -14,6 +14,11 @@ class Prescription {
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
+  final bool isManual;
+  final String? manualText;
+  final String? prescriptionSource;
+  final String? extractedPrescriptionText;
+
   String get displayId {
     if (sequenceNumber != null) {
       return 'PSCT${sequenceNumber.toString().padLeft(4, '0')}';
@@ -36,16 +41,28 @@ class Prescription {
     this.sequenceNumber,
     this.createdAt,
     this.updatedAt,
+    this.isManual = false,
+    this.manualText,
+    this.prescriptionSource,
+    this.extractedPrescriptionText,
   });
 
   factory Prescription.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic val) {
       if (val == null) return null;
-      if (val is DateTime) return val;
+      if (val is DateTime) return val.isUtc ? val.toLocal() : val;
       final str = val.toString().trim();
       if (str.isEmpty || str.toLowerCase() == 'null') return null;
-      final dt = DateTime.tryParse(str);
-      if (dt != null) return dt;
+
+      String parseableStr = str;
+      if (str.contains('T') && !str.endsWith('Z') && !str.contains('+')) {
+        parseableStr = '${str}Z';
+      }
+
+      final dt = DateTime.tryParse(parseableStr) ?? DateTime.tryParse(str);
+      if (dt != null) {
+        return dt.toLocal();
+      }
       
       final slashParts = str.split('/');
       if (slashParts.length == 3) {
@@ -90,6 +107,16 @@ class Prescription {
 
     final vDate = parseDate(json['visitDate'] ?? meta?['hospital_visit_date'] ?? meta?['consultation_date'] ?? meta?['visit_date'] ?? meta?['admission_date'] ?? extractedJson?['visitDate'] ?? extractedJson?['consultationDate']);
 
+    final manualContent = json['manualText'] 
+        ?? json['extractedPrescriptionText'] 
+        ?? meta?['manual_text'] 
+        ?? meta?['prescription_text']
+        ?? extractedJson?['manualText'];
+
+    final isMan = json['isManual'] == true ||
+        json['prescriptionSource'] == 'Self-entered Prescription' ||
+        (manualContent != null && manualContent.toString().trim().isNotEmpty);
+
     return Prescription(
       id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
       hospitalName: hName.toString(),
@@ -105,6 +132,10 @@ class Prescription {
       sequenceNumber: (json['sequenceNumber'] as num?)?.toInt(),
       createdAt: parseDate(json['createdAt']),
       updatedAt: parseDate(json['updatedAt']),
+      isManual: isMan,
+      manualText: manualContent?.toString(),
+      prescriptionSource: json['prescriptionSource']?.toString() ?? (isMan ? 'Self-entered Prescription' : 'PDF Upload'),
+      extractedPrescriptionText: json['extractedPrescriptionText']?.toString(),
     );
   }
 
@@ -120,6 +151,9 @@ class Prescription {
       'originalFileName': originalFileName,
       'mimeType': mimeType,
       'fileSize': fileSize,
+      'isManual': isManual,
+      'manualText': manualText,
+      'prescriptionSource': prescriptionSource,
     };
   }
 }
