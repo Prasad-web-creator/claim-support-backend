@@ -5,6 +5,7 @@ import 'package:claimsupport/core/network/api_client.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:claimsupport/features/authentication/presentation/controllers/auth_controller.dart';
 import 'package:claimsupport/core/utils/auth_storage.dart';
+import 'package:claimsupport/core/network/auth_interceptor.dart';
 import 'package:flutter/services.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -56,6 +57,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           if (refreshToken != null) {
             await AuthStorage.saveRefreshToken(refreshToken);
           }
+          AuthInterceptor.resetSessionExpiredFlag();
           ref.invalidate(authProvider);
           if (mounted) context.go('/dashboard');
         }

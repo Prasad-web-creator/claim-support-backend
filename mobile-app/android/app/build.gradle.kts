@@ -30,6 +30,9 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // Enable resource shrinking to strip unused Android resources from dependencies.
+            // minifyEnabled is already controlled by Flutter's release pipeline (R8).
+            isShrinkResources = true
         }
     }
 }

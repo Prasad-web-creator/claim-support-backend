@@ -223,12 +223,14 @@ class _PrescriptionListScreenState extends ConsumerState<PrescriptionListScreen>
                       children: [
                         const Icon(Icons.medical_information_outlined, size: 16, color: Color(0xFF10B981)),
                         const SizedBox(width: 6),
-                        Text(
-                          'Entered Medical Details / Symptoms:',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857),
+                        Expanded(
+                          child: Text(
+                            'Entered Medical Details / Symptoms:',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857),
+                            ),
                           ),
                         ),
                       ],

@@ -38,9 +38,15 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
             options: Options(responseType: ResponseType.bytes),
           );
 
-      if (response.data != null) {
+      final rawData = response.data;
+      if (rawData != null) {
+        // Cast directly if Dio already returned a Uint8List (avoids a full copy).
+        // Fall back to Uint8List.fromList() only when the underlying type differs.
+        final bytes = rawData is Uint8List
+            ? rawData
+            : Uint8List.fromList(rawData);
         setState(() {
-          _pdfBytes = Uint8List.fromList(response.data!);
+          _pdfBytes = bytes;
           _isLoading = false;
         });
       } else {

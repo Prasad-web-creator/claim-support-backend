@@ -752,13 +752,15 @@ class _UploadPrescriptionScreenState extends ConsumerState<UploadPrescriptionScr
                           ),
                         ),
                         const SizedBox(width: 10),
-                        Text(
-                          'Prescription / Diagnosis Details',
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w600,
-                            color: textColor,
-                            letterSpacing: 0.1,
+                        Expanded(
+                          child: Text(
+                            'Prescription / Diagnosis Details',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                              color: textColor,
+                              letterSpacing: 0.1,
+                            ),
                           ),
                         ),
                         const Spacer(),

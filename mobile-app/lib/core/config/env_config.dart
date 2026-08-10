@@ -15,7 +15,7 @@ class EnvConfig {
         )
       : const String.fromEnvironment(
           'API_BASE_URL',
-          defaultValue: 'http://10.71.14.1:8000/api',
+          defaultValue: 'http://10.125.186.1:8000/api',
         );
 
   static void initialize(Environment env) {

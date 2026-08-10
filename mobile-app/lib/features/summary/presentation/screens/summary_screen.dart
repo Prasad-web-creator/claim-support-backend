@@ -957,7 +957,9 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                               ),
                             ),
                             Divider(height: 1, color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
-                            ...comparison.map((item) {
+                            // Comparison table rows
+                            ...List.generate(comparison.length, (i) {
+                              final item = comparison[i];
                               final isCovered = item['isCovered'] == true;
                               return Column(
                                 children: [
@@ -981,8 +983,8 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                                           flex: 1,
                                           child: Center(
                                             child: Text(
-                                              item['cost'] != null && item['cost'] != 0 
-                                                  ? '₹${item['cost']}' 
+                                              item['cost'] != null && item['cost'] != 0
+                                                  ? '₹${item['cost']}'
                                                   : '-',
                                               style: TextStyle(
                                                 fontSize: 14,
@@ -1012,9 +1014,12 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                                       ],
                                     ),
                                   ),
-                                  if (comparison.last != item)
+                                  if (i < comparison.length - 1)
                                     Divider(
-                                        height: 1, color: isDark ? Colors.grey.shade800 : Colors.grey.shade100),
+                                        height: 1,
+                                        color: isDark
+                                            ? Colors.grey.shade800
+                                            : Colors.grey.shade100),
                                 ],
                               );
                             }),
@@ -1035,7 +1040,9 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      ...comparison.map((item) {
+                      // Coverage Decision Detail cards
+                      ...List.generate(comparison.length, (i) {
+                        final item = comparison[i];
                         final status = (item['status'] ?? item['coverageStatus'] ?? 'Not Covered').toString();
                         final isCovered = status == 'Covered';
                         final isPartial = status == 'Partially Covered';

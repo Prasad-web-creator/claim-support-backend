@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:claimsupport/features/authentication/presentation/screens/splash_screen.dart';
-import 'package:claimsupport/features/authentication/presentation/screens/onboarding_screen.dart';
 import 'package:claimsupport/features/authentication/presentation/screens/login_screen.dart';
 import 'package:claimsupport/features/authentication/presentation/screens/register_screen.dart';
 import 'package:claimsupport/features/dashboard/presentation/screens/dashboard_screen.dart';
@@ -19,19 +18,18 @@ import 'package:claimsupport/features/pdf_viewer/presentation/screens/pdf_viewer
 import 'package:claimsupport/features/logs/presentation/screens/logs_screen.dart';
 import 'package:claimsupport/features/profile/presentation/screens/privacy_policy_screen.dart';
 import 'package:claimsupport/features/profile/presentation/screens/settings_screen.dart';
-import 'package:claimsupport/core/presentation/screens/placeholder_detail_screen.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:claimsupport/features/dashboard/presentation/controllers/dashboard_controller.dart';
 import 'package:claimsupport/features/analysis_reports/presentation/controllers/analysis_report_controller.dart';
 import 'package:claimsupport/features/logs/presentation/controllers/log_controller.dart';
 
-final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
 
 class AppRouter {
   static final router = GoRouter(
-    navigatorKey: _rootNavigatorKey,
+    navigatorKey: rootNavigatorKey,
     initialLocation: '/splash',
     routes: [
       GoRoute(
@@ -41,10 +39,6 @@ class AppRouter {
       GoRoute(
         path: '/splash',
         builder: (context, state) => const SplashScreen(),
-      ),
-      GoRoute(
-        path: '/onboarding',
-        builder: (context, state) => const OnboardingScreen(),
       ),
       GoRoute(
         path: '/login',
@@ -156,13 +150,6 @@ class AppRouter {
             builder: (context, state) => const PrescriptionListScreen(),
           ),
 
-          GoRoute(
-            path: '/placeholder/:title',
-            builder: (context, state) {
-              final title = state.pathParameters['title'] ?? 'Detail';
-              return PlaceholderDetailScreen(title: title);
-            },
-          ),
           GoRoute(
             path: '/activity-logs',
             builder: (context, state) => const LogsScreen(),
