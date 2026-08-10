@@ -9,6 +9,7 @@ import 'package:claimsupport/features/prescriptions/presentation/controllers/pre
 import 'package:claimsupport/features/logs/presentation/controllers/log_controller.dart';
 import 'package:claimsupport/features/analysis_reports/presentation/controllers/analysis_report_controller.dart';
 import 'package:claimsupport/core/utils/auth_storage.dart';
+import 'package:claimsupport/core/network/auth_interceptor.dart';
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
@@ -74,6 +75,7 @@ class ProfileScreen extends ConsumerWidget {
                 const SizedBox(height: 24),
                 ElevatedButton.icon(
                   onPressed: () async {
+                    AuthInterceptor.isManualLogout = true;
                     try {
                       await ApiClient().dio.post('/auth/logout');
                     } catch (e) {

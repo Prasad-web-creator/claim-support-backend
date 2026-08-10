@@ -70,7 +70,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       } on DioException catch (e) {
         String errorMsg = 'Registration failed';
         if (e.response != null && e.response?.data != null) {
-          errorMsg = e.response?.data['message'] ?? errorMsg;
+          errorMsg = e.response?.data['detail'] ?? e.response?.data['message'] ?? errorMsg;
         }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorMsg)));

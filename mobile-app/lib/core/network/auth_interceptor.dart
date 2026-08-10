@@ -11,9 +11,13 @@ class AuthInterceptor extends Interceptor {
   // Flag to prevent duplicate session expired dialogs
   static bool _sessionExpiredShown = false;
 
+  // Flag to indicate intentional manual logout
+  static bool isManualLogout = false;
+
   /// Resets the session expired flag. Should be called after successful login.
   static void resetSessionExpiredFlag() {
     _sessionExpiredShown = false;
+    isManualLogout = false;
   }
 
   /// Parses the JWT token to extract the payload map.
@@ -50,6 +54,10 @@ class AuthInterceptor extends Interceptor {
 
   /// Clears session and shows a non-dismissible dialog before redirecting to login.
   Future<void> _logoutAndRedirectToLogin() async {
+    // If it's an intentional manual logout, do not show the dialog and do not redirect 
+    // (the profile screen will handle redirection).
+    if (isManualLogout) return;
+
     // If a dialog was already shown, don't show another one.
     if (_sessionExpiredShown) return;
     _sessionExpiredShown = true;
