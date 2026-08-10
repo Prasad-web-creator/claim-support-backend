@@ -78,7 +78,7 @@ class AnalysisReportRepository {
 
   Future<void> deleteBatchAnalysisReports(List<String> ids) async {
     try {
-      await _dio.post('/analysis/reports/batch-delete', data: {'ids': ids});
+      await _dio.post('/analysis/batch-delete', data: {'ids': ids});
     } on DioException catch (e, st) {
       throw AppException(
         statusCode: e.response?.statusCode,
