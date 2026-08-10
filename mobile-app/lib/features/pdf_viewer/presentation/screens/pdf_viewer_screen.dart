@@ -45,6 +45,21 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
         final bytes = rawData is Uint8List
             ? rawData
             : Uint8List.fromList(rawData);
+            
+        if (bytes.isEmpty || bytes.length < 10) {
+          String msg = 'Invalid document';
+          if (widget.title.startsWith('PSCT')) {
+            msg = 'Invalid prescription Uploaded';
+          } else if (widget.title.startsWith('PCY')) {
+            msg = 'Invalid policy Uploaded';
+          }
+          setState(() {
+            _error = msg;
+            _isLoading = false;
+          });
+          return;
+        }
+
         setState(() {
           _pdfBytes = bytes;
           _isLoading = false;
@@ -56,8 +71,17 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
         });
       }
     } catch (e) {
+      String msg = 'Failed to load document: $e';
+      if (e is DioException && e.response?.statusCode == 404) {
+        msg = 'Invalid document';
+        if (widget.title.startsWith('PSCT')) {
+          msg = 'Invalid prescription Uploaded';
+        } else if (widget.title.startsWith('PCY')) {
+          msg = 'Invalid policy Uploaded';
+        }
+      }
       setState(() {
-        _error = 'Failed to load document: $e';
+        _error = msg;
         _isLoading = false;
       });
     }
@@ -83,7 +107,7 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
                     child: Text(
                       _error!,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.red, fontSize: 16),
+                      style: const TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.w600),
                     ),
                   ),
                 )
@@ -91,6 +115,21 @@ class _PdfViewerScreenState extends ConsumerState<PdfViewerScreen> {
                   _pdfBytes!,
                   canShowScrollHead: false,
                   canShowScrollStatus: true,
+                  onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
+                    String msg = 'Invalid document';
+                    if (widget.title.startsWith('PSCT')) {
+                      msg = 'Invalid prescription Uploaded';
+                    } else if (widget.title.startsWith('PCY')) {
+                      msg = 'Invalid policy Uploaded';
+                    }
+                    Future.microtask(() {
+                      if (mounted) {
+                        setState(() {
+                          _error = msg;
+                        });
+                      }
+                    });
+                  },
                 ),
     );
   }
