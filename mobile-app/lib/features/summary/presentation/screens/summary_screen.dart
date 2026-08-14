@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:claimsupport/core/network/api_client.dart';
 import 'package:claimsupport/core/utils/shared_prefs.dart';
 import 'package:claimsupport/features/summary/presentation/widgets/coverage_donut_chart.dart';
-import 'package:claimsupport/features/summary/services/coverage_report_pdf_service.dart';
+
 import 'package:claimsupport/features/dashboard/presentation/controllers/dashboard_controller.dart';
 
 class SummaryScreen extends ConsumerStatefulWidget {
@@ -18,7 +18,7 @@ class SummaryScreen extends ConsumerStatefulWidget {
 
 class _SummaryScreenState extends ConsumerState<SummaryScreen> {
   late Future<Map<String, dynamic>> _dataFuture;
-  bool _isGeneratingPdf = false;
+
 
   @override
   void initState() {
@@ -259,57 +259,7 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                           ),
                         ),
                       ),
-                      // Download PDF Button (Only when analysis and validations are completely valid)
-                      if (!isDocumentInvalid) ...[
-                        const SizedBox(width: 8),
-                        _isGeneratingPdf
-                            ? Container(
-                                padding: const EdgeInsets.all(8),
-                                child: SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(primaryBlue),
-                                  ),
-                                ),
-                              )
-                            : Tooltip(
-                                message: 'Download PDF Report',
-                                child: InkWell(
-                                  onTap: () async {
-                                    setState(() => _isGeneratingPdf = true);
-                                    try {
-                                      await CoverageReportPdfService.generateAndSharePdf(context, data);
-                                    } finally {
-                                      if (mounted) {
-                                        setState(() => _isGeneratingPdf = false);
-                                      }
-                                    }
-                                  },
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: primaryBlue,
-                                      borderRadius: BorderRadius.circular(10),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: primaryBlue.withAlpha(50),
-                                          blurRadius: 6,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                    child: const Icon(
-                                      Icons.download_rounded,
-                                      color: Colors.white,
-                                      size: 18,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                      ],
+
                     ],
                   ),
                   const SizedBox(height: 24),
