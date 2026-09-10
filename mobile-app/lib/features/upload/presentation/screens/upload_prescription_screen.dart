@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:claimsupport/core/network/api_client.dart';
 import 'package:claimsupport/core/utils/shared_prefs.dart';
+import 'package:claimsupport/core/utils/device_app_info.dart';
 
 class UploadPrescriptionScreen extends ConsumerStatefulWidget {
   const UploadPrescriptionScreen({super.key});
@@ -95,20 +96,21 @@ class _UploadPrescriptionScreenState extends ConsumerState<UploadPrescriptionScr
         
         if (response.statusCode == 200) {
           _uploadedPath = response.data['fileId'].toString();
+          final isImageBased = response.data['isImageBased'] == true ||
+              _selectedFileName?.toLowerCase().endsWith('.jpg') == true ||
+              _selectedFileName?.toLowerCase().endsWith('.jpeg') == true ||
+              _selectedFileName?.toLowerCase().endsWith('.png') == true;
           final prefs = SharedPrefs.instance;
           await prefs.setString('prescription_path', _uploadedPath!);
+          await prefs.setBool('prescription_is_image_based', isImageBased);
           
           try {
+            final agreementData = await DeviceAppInfo.buildAgreementData();
             await ApiClient().dio.post('/prescriptions', data: {
               'hospitalName': '',
               'gridFsFileId': _uploadedPath,
               'originalFileName': _selectedFileName,
-              'agreement': {
-                'termsAccepted': true,
-                'termsVersion': '1.0',
-                'appVersion': '1.0.0',
-                'platform': 'Android',
-              }
+              'agreement': agreementData,
             });
             
             if (mounted) {
@@ -187,18 +189,13 @@ class _UploadPrescriptionScreenState extends ConsumerState<UploadPrescriptionScr
     try {
       if (hasManualText) {
         try {
+          final agreementData = await DeviceAppInfo.buildAgreementData();
           final response = await ApiClient().dio.post('/prescriptions', data: {
             'hospitalName': '',
             'isManual': true,
-            'manualText': manualText,
-            'prescriptionSource': 'Self-entered Prescription',
+            'extractedPrescriptionText': manualText,
             'originalFileName': 'Manual Prescription',
-            'agreement': {
-              'termsAccepted': true,
-              'termsVersion': '1.0',
-              'appVersion': '1.0.0',
-              'platform': 'Android',
-            }
+            'agreement': agreementData,
           });
 
           String? rxId;

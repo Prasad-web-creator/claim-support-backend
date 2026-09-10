@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
+import 'package:intl/intl.dart';
 import 'package:claimsupport/core/network/api_client.dart';
 import 'package:claimsupport/core/utils/shared_prefs.dart';
+import 'package:claimsupport/core/utils/device_app_info.dart';
 
 class UploadPolicyScreen extends StatefulWidget {
   const UploadPolicyScreen({super.key});
@@ -16,7 +18,61 @@ class UploadPolicyScreen extends StatefulWidget {
 class _UploadPolicyScreenState extends State<UploadPolicyScreen> {
   String? _selectedFileName;
   String? _uploadedPath;
+  String? _policyId;
+  DateTime? _selectedPolicyStartDate;
   bool _isUploading = false;
+
+  Future<void> _pickStartDate() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final initialDate = (_selectedPolicyStartDate != null && !_selectedPolicyStartDate!.isAfter(today))
+        ? _selectedPolicyStartDate!
+        : today;
+
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(1970),
+      lastDate: today,
+      helpText: 'Select Policy Start Date',
+      confirmText: 'Confirm',
+      cancelText: 'Cancel',
+      builder: (context, child) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: const Color(0xFF2563EB),
+              onPrimary: Colors.white,
+              surface: isDark ? const Color(0xFF1F2937) : Colors.white,
+              onSurface: isDark ? Colors.white : const Color(0xFF111827),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedPolicyStartDate = picked;
+      });
+
+      final prefs = SharedPrefs.instance;
+      await prefs.setString('user_policy_start_date', picked.toIso8601String());
+
+      // If policy record already exists in DB, update it
+      if (_policyId != null) {
+        try {
+          await ApiClient().dio.put('/policies/$_policyId', data: {
+            'policyStartDate': picked.toIso8601String(),
+          });
+        } catch (e) {
+          debugPrint("Failed to update policy start date: $e");
+        }
+      }
+    }
+  }
 
   Future<void> _pickAndUploadFile() async {
     FilePickerResult? result = await FilePicker.pickFiles(
@@ -39,28 +95,30 @@ class _UploadPolicyScreenState extends State<UploadPolicyScreen> {
         
         if (response.statusCode == 200) {
           _uploadedPath = response.data['fileId'].toString();
+          final isImageBased = response.data['isImageBased'] == true ||
+              _selectedFileName?.toLowerCase().endsWith('.jpg') == true ||
+              _selectedFileName?.toLowerCase().endsWith('.jpeg') == true ||
+              _selectedFileName?.toLowerCase().endsWith('.png') == true;
           final prefs = SharedPrefs.instance;
           await prefs.setString('policy_path', _uploadedPath!);
+          await prefs.setBool('policy_is_image_based', isImageBased);
           await prefs.remove('policy_id'); // Ensure old policy_id is cleared
           
           try {
+            final agreementData = await DeviceAppInfo.buildAgreementData();
             final policyResponse = await ApiClient().dio.post('/policies', data: {
               'insuranceCompany': '',
               'policyNumber': '',
               'policyName': 'Uploaded Policy',
               'gridFsFileId': _uploadedPath,
               'originalFileName': _selectedFileName,
-              'agreement': {
-                'termsAccepted': true,
-                'termsVersion': '1.0',
-                'appVersion': '1.0.0',
-                'platform': 'Android',
-              }
+              'policyStartDate': _selectedPolicyStartDate?.toIso8601String(),
+              'agreement': agreementData,
             });
             
-            final prefs = SharedPrefs.instance;
             final newPolicyId = policyResponse.data['_id'] ?? policyResponse.data['id'];
-            await prefs.setString('policy_id', newPolicyId.toString());
+            _policyId = newPolicyId.toString();
+            await prefs.setString('policy_id', _policyId!);
             await prefs.remove('policy_path');
             
             if (mounted) {
@@ -107,12 +165,41 @@ class _UploadPolicyScreenState extends State<UploadPolicyScreen> {
     }
   }
 
-  void _analyzeDocuments() {
-    if (_uploadedPath == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please upload a file first.')));
+  Future<void> _analyzeDocuments() async {
+    if (_selectedPolicyStartDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select the policy start date before analyzing.'),
+          backgroundColor: Colors.red,
+        ),
+      );
       return;
     }
-    context.push('/analysis');
+
+    if (_uploadedPath == null && _policyId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please upload a file first.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Ensure policy record has latest start date if already uploaded
+    if (_policyId != null && _selectedPolicyStartDate != null) {
+      try {
+        await ApiClient().dio.put('/policies/$_policyId', data: {
+          'policyStartDate': _selectedPolicyStartDate!.toIso8601String(),
+        });
+      } catch (e) {
+        debugPrint("Failed to sync policy start date before analysis: $e");
+      }
+    }
+
+    if (mounted) {
+      context.push('/analysis');
+    }
   }
 
   @override
@@ -197,6 +284,89 @@ class _UploadPolicyScreenState extends State<UploadPolicyScreen> {
                   fontSize: 15,
                   height: 1.5,
                 ),
+              ),
+              const SizedBox(height: 24),
+
+              // Policy Start Date Input (Required)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        "Policy Start Date",
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: textColor,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        "*",
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: _pickStartDate,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF374151) : const Color(0xFFEEF2F6),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: _selectedPolicyStartDate != null
+                              ? primaryBlue
+                              : (isDark ? Colors.grey.shade700 : Colors.grey.shade300),
+                          width: _selectedPolicyStartDate != null ? 1.5 : 1.0,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: primaryBlue.withAlpha(25),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.calendar_month_rounded,
+                              color: primaryBlue,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _selectedPolicyStartDate != null
+                                  ? DateFormat('dd-MM-yyyy').format(_selectedPolicyStartDate!)
+                                  : 'Select Policy Start Date (DD-MM-YYYY)',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: _selectedPolicyStartDate != null
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                                color: _selectedPolicyStartDate != null
+                                    ? textColor
+                                    : textSecondary,
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            Icons.arrow_drop_down,
+                            color: textSecondary,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
               

@@ -25,6 +25,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen>
   bool _dialogShowing = false;
   // Guard: prevent navigating to summary more than once
   bool _navigatedToSummary = false;
+  bool _isImageBased = false;
 
   final List<String> _stageLabels = [
     'Validating Documents',
@@ -47,6 +48,14 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
+
+    try {
+      final prefs = SharedPrefs.instance;
+      final rxImageBased = prefs.getBool('prescription_is_image_based') ?? false;
+      final policyImageBased = prefs.getBool('policy_is_image_based') ?? false;
+      _isImageBased = rxImageBased || policyImageBased;
+    } catch (_) {}
+
     _simulateProgress();
 
     // Start the analysis job
@@ -228,7 +237,51 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen>
                     height: 1.5,
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
+
+                // Image-based PDF Notification Card
+                if (!_hasError && _isImageBased && _currentStage < _stageLabels.length) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 24),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFF3B82F6).withAlpha(100),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2563EB).withAlpha(25),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.timer_outlined,
+                            color: Color(0xFF2563EB),
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            "Your uploaded PDF is image-based, so it may take some time. Please stay here.",
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
 
                 // Pipeline Progress
                 if (!_hasError)

@@ -16,7 +16,8 @@ class ApiClient {
     dio = Dio(BaseOptions(
       baseUrl: EnvConfig.apiBaseUrl,
       connectTimeout: const Duration(seconds: 60),
-      receiveTimeout: const Duration(seconds: 120),
+      sendTimeout: const Duration(seconds: 120),
+      receiveTimeout: const Duration(seconds: 600),  // 10 min — covers multi-page parallel OCR
     ));
 
     dio.interceptors.add(AuthInterceptor());

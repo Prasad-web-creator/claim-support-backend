@@ -160,39 +160,42 @@ GeneratedPluginRegistrant.*
 *.freezed.dart
 
 # ==============================================================================
-# 6. Node.js / Express Backend
+# 6. Python Backend
 # ==============================================================================
-# Node core
+.venv/
+.venv311/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+dist/
+build/
+*.egg-info/
+logs/
+*.log
+
+# ==============================================================================
+# 7. Node.js / Legacy Backend
+# ==============================================================================
 node_modules/
 .npm/
 .pnpm-store/
 .yarn/
-!.yarn/patches
-!.yarn/releases
-!.yarn/plugins
-!.yarn/sdks
-!.yarn/versions
-
-# Caches
-.cache/
-.parcel-cache/
-.next/
-.nuxt/
-
-# Build artifacts and temp
 dist/
 tmp/
 temp/
 uploads/
-logs/
 debug/
 
-# Package locks backup
-package-lock.json.backup
-yarn.lock.backup
-
 # ==============================================================================
-# 7. MongoDB / GridFS
+# 8. MongoDB / GridFS
 # ==============================================================================
 dump/
 *.bson
@@ -203,10 +206,16 @@ dump/
 mongodb_dumps/
 
 # ==============================================================================
-# 8. AI & OCR Processing
+# 9. AI & OCR Processing
 # ==============================================================================
-# Temporary extractions
 ai-cache/
+ocr_cache/
 ocr-temp/
 *.pdf.txt
 *.ocr.json
+
+# ==============================================================================
+# 10. Documentation / Local Docs
+# ==============================================================================
+claimsupport-docs/
+
