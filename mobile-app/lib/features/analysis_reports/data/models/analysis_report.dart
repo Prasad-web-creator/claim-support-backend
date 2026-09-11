@@ -17,6 +17,7 @@ class AnalysisReport {
   final Map<String, dynamic>? prescriptionJson;
   final Map<String, dynamic>? policyMetadata;
   final Map<String, dynamic>? prescriptionMetadata;
+  final Map<String, dynamic>? referenceComparison;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -39,6 +40,7 @@ class AnalysisReport {
     this.prescriptionJson,
     this.policyMetadata,
     this.prescriptionMetadata,
+    this.referenceComparison,
     this.createdAt,
     this.updatedAt,
   });
@@ -128,6 +130,7 @@ class AnalysisReport {
     final pMeta = json['policyMetadata'] is Map ? json['policyMetadata'] as Map<String, dynamic> : null;
     final rxJson = json['prescriptionJson'] is Map ? json['prescriptionJson'] as Map<String, dynamic> : null;
     final rxMeta = json['prescriptionMetadata'] is Map ? json['prescriptionMetadata'] as Map<String, dynamic> : null;
+    final refComp = json['referenceComparison'] is Map ? json['referenceComparison'] as Map<String, dynamic> : null;
 
     final polName = pJson?['policyName'] ??
         pJson?['insuranceCompany'] ??
@@ -160,6 +163,7 @@ class AnalysisReport {
       prescriptionJson: rxJson,
       policyMetadata: pMeta,
       prescriptionMetadata: rxMeta,
+      referenceComparison: refComp,
       createdAt: parseDate(json['createdAt']),
       updatedAt: parseDate(json['updatedAt']),
     );

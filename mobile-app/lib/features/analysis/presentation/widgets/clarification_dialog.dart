@@ -1,5 +1,6 @@
 // ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'dart:developer' as developer;
 
 // ─── Individual Question Widgets ────────────────────────────────────────────
@@ -24,11 +25,80 @@ class _SingleChoiceQuestion extends StatefulWidget {
 
 class _SingleChoiceQuestionState extends State<_SingleChoiceQuestion> {
   String? _selected;
+  late final TextEditingController _customInputController;
+  DateTime? _pickedDate;
 
   @override
   void initState() {
     super.initState();
     _selected = widget.currentValue;
+    _customInputController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _customInputController.dispose();
+    super.dispose();
+  }
+
+  bool _isOptionRequiringInput(String optStr) {
+    final lower = optStr.toLowerCase();
+    return lower.contains('enter') ||
+        lower.contains('select') ||
+        lower.contains('specify') ||
+        lower.contains('specific past date') ||
+        lower.contains('other');
+  }
+
+  bool _isDateContext(String optStr) {
+    final q = widget.question;
+    final id = (q['id'] ?? '').toString().toLowerCase();
+    final title = (q['title'] ?? '').toString().toLowerCase();
+    final qText = (q['question'] ?? '').toString().toLowerCase();
+    final optLower = optStr.toLowerCase();
+
+    return id.contains('date') ||
+        title.contains('date') ||
+        qText.contains('date') ||
+        optLower.contains('date');
+  }
+
+  Future<void> _pickDateForOption(String optStr) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _pickedDate ?? now,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2035),
+    );
+    if (picked != null) {
+      final formatted = DateFormat('dd-MMM-yyyy').format(picked);
+      setState(() {
+        _pickedDate = picked;
+        _customInputController.text = formatted;
+      });
+      widget.onChanged(formatted);
+      developer.log('[Clarification] Picked date: $formatted for question ${widget.question['id']}');
+    }
+  }
+
+  void _handleOptionSelection(String optStr) {
+    setState(() => _selected = optStr);
+    if (_isOptionRequiringInput(optStr)) {
+      if (_isDateContext(optStr)) {
+        if (_customInputController.text.isNotEmpty) {
+          widget.onChanged(_customInputController.text);
+        } else {
+          widget.onChanged(optStr);
+          _pickDateForOption(optStr);
+        }
+      } else {
+        widget.onChanged(_customInputController.text.isNotEmpty ? "$optStr: ${_customInputController.text}" : optStr);
+      }
+    } else {
+      widget.onChanged(optStr);
+    }
+    developer.log('[Clarification] Single choice selected: $optStr for question ${widget.question['id']}');
   }
 
   @override
@@ -49,16 +119,15 @@ class _SingleChoiceQuestionState extends State<_SingleChoiceQuestion> {
       children: options.map((opt) {
         final optStr = opt.toString();
         final isSelected = _selected == optStr;
+        final requiresInput = _isOptionRequiringInput(optStr);
+        final isDate = _isDateContext(optStr);
+
         return Padding(
           padding: const EdgeInsets.only(bottom: 8.0),
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: () {
-                setState(() => _selected = optStr);
-                widget.onChanged(optStr);
-                developer.log('[Clarification] Single choice selected: $optStr for question ${widget.question['id']}');
-              },
+              onTap: () => _handleOptionSelection(optStr),
               borderRadius: BorderRadius.circular(12),
               child: Ink(
                 decoration: BoxDecoration(
@@ -71,24 +140,97 @@ class _SingleChoiceQuestionState extends State<_SingleChoiceQuestion> {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Radio<String>(
-                        value: optStr,
-                        groupValue: _selected,
-                        onChanged: (val) {
-                          setState(() => _selected = val);
-                          widget.onChanged(val);
-                          developer.log('[Clarification] Radio changed: $val for question ${widget.question['id']}');
-                        },
+                      Row(
+                        children: [
+                          Radio<String>(
+                            value: optStr,
+                            groupValue: _selected,
+                            onChanged: (val) {
+                              if (val != null) _handleOptionSelection(val);
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              optStr,
+                              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          optStr,
-                          style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                      if (isSelected && requiresInput) ...[
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 48, right: 8, bottom: 8),
+                          child: isDate
+                              ? Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    OutlinedButton.icon(
+                                      onPressed: () => _pickDateForOption(optStr),
+                                      icon: const Icon(Icons.calendar_month_rounded, size: 18),
+                                      label: Text(
+                                        _pickedDate != null
+                                            ? DateFormat('dd-MMM-yyyy').format(_pickedDate!)
+                                            : 'Select Date from Calendar',
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    TextFormField(
+                                      controller: _customInputController,
+                                      style: const TextStyle(fontSize: 13),
+                                      decoration: InputDecoration(
+                                        hintText: 'Or enter date (e.g. 15-Feb-2026)',
+                                        hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                                        isDense: true,
+                                        filled: true,
+                                        fillColor: isDark ? const Color(0xFF111827) : Colors.white,
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                        prefixIcon: const Icon(Icons.edit_calendar_rounded, size: 16),
+                                        suffixIcon: IconButton(
+                                          icon: const Icon(Icons.calendar_today_rounded, size: 16),
+                                          onPressed: () => _pickDateForOption(optStr),
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                          borderSide: BorderSide(color: Colors.grey.withAlpha(50)),
+                                        ),
+                                      ),
+                                      onChanged: (val) {
+                                        widget.onChanged(val.trim().isEmpty ? null : val.trim());
+                                      },
+                                    ),
+                                  ],
+                                )
+                              : TextFormField(
+                                  controller: _customInputController,
+                                  style: const TextStyle(fontSize: 13),
+                                  decoration: InputDecoration(
+                                    hintText: 'Please specify details...',
+                                    hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                                    isDense: true,
+                                    filled: true,
+                                    fillColor: isDark ? const Color(0xFF111827) : Colors.white,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(color: Colors.grey.withAlpha(50)),
+                                    ),
+                                  ),
+                                  onChanged: (val) {
+                                    widget.onChanged(val.trim().isEmpty ? null : "$optStr: ${val.trim()}");
+                                  },
+                                ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -260,12 +402,44 @@ class _TextInputWidgetState extends State<_TextInputWidget> {
     super.dispose();
   }
 
+  bool get _isDateContext {
+    final q = widget.question;
+    final id = (q['id'] ?? '').toString().toLowerCase();
+    final title = (q['title'] ?? '').toString().toLowerCase();
+    final qText = (q['question'] ?? '').toString().toLowerCase();
+    final type = (q['type'] ?? '').toString().toLowerCase();
+    return type == 'date' ||
+        type == 'datetime' ||
+        id.contains('date') ||
+        title.contains('date') ||
+        qText.contains('date');
+  }
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2035),
+    );
+    if (picked != null) {
+      final formatted = DateFormat('dd-MMM-yyyy').format(picked);
+      setState(() {
+        _controller.text = formatted;
+      });
+      widget.onChanged(formatted);
+      developer.log('[Clarification] TextInput picked date: $formatted for question ${widget.question['id']}');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final surfaceColor = isDark ? const Color(0xFF1F2937) : const Color(0xFFF3F4F6);
     final type = widget.question['type'] ?? 'text';
+    final isDate = _isDateContext;
 
     return TextFormField(
       controller: _controller,
@@ -276,6 +450,14 @@ class _TextInputWidgetState extends State<_TextInputWidget> {
       decoration: InputDecoration(
         filled: true,
         fillColor: surfaceColor,
+        hintText: isDate ? 'e.g., 15-Feb-2026 (or tap calendar)' : null,
+        prefixIcon: isDate ? const Icon(Icons.edit_calendar_rounded, size: 18) : null,
+        suffixIcon: isDate
+            ? IconButton(
+                icon: const Icon(Icons.calendar_today_rounded, size: 20),
+                onPressed: _pickDate,
+              )
+            : null,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -286,6 +468,136 @@ class _TextInputWidgetState extends State<_TextInputWidget> {
           borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
         ),
       ),
+    );
+  }
+}
+
+class _DateQuestionWidget extends StatefulWidget {
+  final Map<String, dynamic> question;
+  final String? currentValue;
+  final ValueChanged<String?> onChanged;
+
+  const _DateQuestionWidget({
+    super.key,
+    required this.question,
+    required this.currentValue,
+    required this.onChanged,
+  });
+
+  @override
+  State<_DateQuestionWidget> createState() => _DateQuestionWidgetState();
+}
+
+class _DateQuestionWidgetState extends State<_DateQuestionWidget> {
+  late final TextEditingController _controller;
+  DateTime? _selectedDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.currentValue ?? '');
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? now,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2035),
+    );
+    if (picked != null) {
+      final formatted = DateFormat('dd-MMM-yyyy').format(picked);
+      setState(() {
+        _selectedDate = picked;
+        _controller.text = formatted;
+      });
+      widget.onChanged(formatted);
+      developer.log('[Clarification] DateQuestionWidget picked date: $formatted for question ${widget.question['id']}');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final surfaceColor = isDark ? const Color(0xFF1F2937) : const Color(0xFFF3F4F6);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: _pickDate,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: surfaceColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _selectedDate != null ? theme.colorScheme.primary : Colors.transparent,
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.calendar_month_rounded,
+                  color: _selectedDate != null ? theme.colorScheme.primary : Colors.grey,
+                  size: 22,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _controller.text.isNotEmpty ? _controller.text : 'Select Date from Calendar',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: _controller.text.isNotEmpty ? FontWeight.w600 : FontWeight.w400,
+                      color: _controller.text.isNotEmpty
+                          ? (isDark ? Colors.white : Colors.black87)
+                          : Colors.grey,
+                    ),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _pickDate,
+                  icon: const Icon(Icons.arrow_drop_down, size: 20),
+                  label: const Text('Pick', style: TextStyle(fontWeight: FontWeight.w600)),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _controller,
+          onChanged: (val) {
+            widget.onChanged(val.trim().isEmpty ? null : val.trim());
+          },
+          decoration: InputDecoration(
+            hintText: 'Or enter date manually (e.g. 15-Feb-2026)',
+            hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+            filled: true,
+            fillColor: surfaceColor,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            prefixIcon: const Icon(Icons.edit_calendar_rounded, size: 18),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -347,10 +659,37 @@ class _ClarificationDialogState extends State<ClarificationDialog> {
   }
 
   Widget _buildQuestionInput(Map<String, dynamic> q) {
-    final String type = q['type'] ?? 'text';
-    final String id = q['id'];
+    final String type = (q['type'] ?? 'text').toString().toLowerCase();
+    final String id = (q['id'] ?? '').toString();
+    final String title = (q['title'] ?? '').toString();
+    final String qText = (q['question'] ?? '').toString();
+    final options = List<dynamic>.from(q['options'] ?? []);
+
+    final bool isDate = type == 'date' ||
+        type == 'datetime' ||
+        (options.isEmpty &&
+            (id.toLowerCase().contains('date') ||
+                title.toLowerCase().contains('date') ||
+                qText.toLowerCase().contains('date')));
+
+    if (isDate) {
+      return _DateQuestionWidget(
+        key: ValueKey('date_$id'),
+        question: q,
+        currentValue: _answers[id] as String?,
+        onChanged: (val) => _onAnswerChanged(id, val),
+      );
+    }
 
     switch (type) {
+      case 'date':
+      case 'datetime':
+        return _DateQuestionWidget(
+          key: ValueKey('date_$id'),
+          question: q,
+          currentValue: _answers[id] as String?,
+          onChanged: (val) => _onAnswerChanged(id, val),
+        );
       case 'single_choice':
         return _SingleChoiceQuestion(
           key: ValueKey('sc_$id'),

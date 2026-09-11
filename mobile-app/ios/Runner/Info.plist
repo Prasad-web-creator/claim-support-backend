@@ -70,9 +70,7 @@
 	<string>Claim Support accesses your photo library so you can select prescriptions and insurance documents to upload for claim analysis.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Claim Support uses the camera to capture prescriptions and insurance documents for claim analysis.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Claim Support uses the microphone only when recording video attachments for claims.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Claim Support may use your location while using the app to help record claim-related information.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

@@ -3,5 +3,12 @@
     "python.analysis.extraPaths": [
         "${workspaceFolder}/backend-python"
     ],
-    "python.analysis.typeCheckingMode": "basic"
+    "python.analysis.typeCheckingMode": "basic",
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/*.pyc": true,
+        "**/.pytest_cache": true,
+        "**/.dart_tool": true,
+        "**/__init__.py": true
+    }
 }

@@ -40,7 +40,23 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
     final prefs = SharedPrefs.instance;
     final resultStr = prefs.getString('analysis_result');
     if (resultStr != null) {
-      return jsonDecode(resultStr);
+      final map = jsonDecode(resultStr) as Map<String, dynamic>;
+      final refComp = map['referenceComparison'];
+      final hasNoRef = refComp == null || (refComp is Map && refComp.isEmpty);
+      final reportId = map['_id'] ?? map['id'];
+      if (hasNoRef && reportId != null && reportId.toString().isNotEmpty) {
+        try {
+          final response = await ApiClient().dio.get('/analysis/$reportId');
+          if (response.data is Map<String, dynamic>) {
+            final freshData = response.data as Map<String, dynamic>;
+            prefs.setString('analysis_result', jsonEncode(freshData));
+            return freshData;
+          }
+        } catch (e) {
+          debugPrint("Fallback fetch for reference comparison failed: $e");
+        }
+      }
+      return map;
     }
     return {};
   }
@@ -81,6 +97,8 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
         final processingTime = data['processingTimeMs'] ?? 0;
         // Clarification Q&A from LLM interactive session
         final clarificationQA = data['clarificationAnswersUsed'] as List<dynamic>? ?? [];
+        // Reference benchmark comparison (from Marsh GIC Snapshot & ReAssure 3.0 Reference Standards)
+        final referenceComparison = data['referenceComparison'] as Map<String, dynamic>? ?? {};
 
         // Document & validation statuses
         final docValidity = data['documentValidity'] as Map<String, dynamic>?;
@@ -1034,13 +1052,14 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              // Card Header: Item name + Status Pill
                               Row(
                                 children: [
                                   Icon(itemIcon, color: itemColor, size: 20),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      item['item'] ?? 'Unknown Item',
+                                      item['item'] ?? 'Prescribed Treatment / Diagnosis',
                                       style: TextStyle(
                                         fontSize: 15,
                                         fontWeight: FontWeight.w700,
@@ -1066,45 +1085,144 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                                   ),
                                 ],
                               ),
+
+                              const SizedBox(height: 12),
+
+                              // 1. Coverage Status Line
+                              Row(
+                                children: [
+                                  Text(
+                                    'Coverage status : ',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: textColor,
+                                    ),
+                                  ),
+                                  Text(
+                                    status,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
+                                      color: itemColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              // 2. Status Reason Section
                               if (reason.isNotEmpty) ...[
-                                const SizedBox(height: 10),
-                                Text(
-                                  reason,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: textSecondary,
-                                    height: 1.45,
+                                const SizedBox(height: 8),
+                                RichText(
+                                  text: TextSpan(
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: textSecondary,
+                                      height: 1.45,
+                                    ),
+                                    children: [
+                                      TextSpan(
+                                        text: 'Status Reason : ',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          color: textColor,
+                                        ),
+                                      ),
+                                      TextSpan(text: reason),
+                                    ],
                                   ),
                                 ),
                               ],
+
+                              // 3. Policy Evidence Section
                               if (policyEvidence.isNotEmpty && policyEvidence != "No matching policy clause found.") ...[
-                                const SizedBox(height: 8),
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Icon(Icons.gavel_outlined, size: 14, color: primaryBlue),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        'Policy Evidence: $policyEvidence',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: primaryBlue,
+                                const SizedBox(height: 10),
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? primaryBlue.withAlpha(20) : const Color(0xFFEFF6FF),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: isDark ? primaryBlue.withAlpha(45) : const Color(0xFFBFDBFE),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(Icons.gavel_outlined, size: 16, color: primaryBlue),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: RichText(
+                                          text: TextSpan(
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1E40AF),
+                                              height: 1.4,
+                                            ),
+                                            children: [
+                                              TextSpan(
+                                                text: 'Policy Evidence : ',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w700,
+                                                  color: primaryBlue,
+                                                ),
+                                              ),
+                                              TextSpan(
+                                                text: policyEvidence,
+                                                style: const TextStyle(fontWeight: FontWeight.w500),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ],
+
+                              // 4. Financial Status Section
                               if (financialDecision.isNotEmpty) ...[
-                                const SizedBox(height: 6),
-                                Text(
-                                  'Financial Note: $financialDecision',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontStyle: FontStyle.italic,
-                                    color: textSecondary,
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF10B981).withAlpha(18) : const Color(0xFFF0FDF4),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: isDark ? const Color(0xFF10B981).withAlpha(45) : const Color(0xFFBBF7D0),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(
+                                        Icons.account_balance_wallet_outlined,
+                                        size: 16,
+                                        color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: RichText(
+                                          text: TextSpan(
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF065F46),
+                                              height: 1.4,
+                                            ),
+                                            children: [
+                                              TextSpan(
+                                                text: 'Financial Status : ',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w700,
+                                                  color: isDark ? const Color(0xFF34D399) : const Color(0xFF047857),
+                                                ),
+                                              ),
+                                              TextSpan(text: financialDecision),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
@@ -1112,6 +1230,22 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                           ),
                         );
                       }),
+                      const SizedBox(height: 24),
+                    ],
+
+                    // ─── Reference Benchmark Comparison (Extra Content) ───
+                    if (referenceComparison.isNotEmpty &&
+                        ((referenceComparison['detectedWaitingConditions'] as List?)?.isNotEmpty == true ||
+                         (referenceComparison['detectedPermanentExclusions'] as List?)?.isNotEmpty == true ||
+                         (referenceComparison['actionableTakeaways'] as List?)?.isNotEmpty == true)) ...[
+                      _buildReferenceBenchmarkSection(
+                        context: context,
+                        refData: referenceComparison,
+                        isDark: isDark,
+                        theme: theme,
+                        textColor: textColor,
+                        textSecondary: textSecondary,
+                      ),
                       const SizedBox(height: 24),
                     ],
 
@@ -1333,5 +1467,210 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
     );
   }
 
+  // ─── Helper: Reference Benchmark Comparison Section (Extra Content) ───
+  Widget _buildReferenceBenchmarkSection({
+    required BuildContext context,
+    required Map<String, dynamic> refData,
+    required bool isDark,
+    required ThemeData theme,
+    required Color textColor,
+    required Color textSecondary,
+  }) {
+    final waitingConditions = refData['detectedWaitingConditions'] as List<dynamic>? ?? [];
+    final permanentExclusions = refData['detectedPermanentExclusions'] as List<dynamic>? ?? [];
+    final takeaways = refData['actionableTakeaways'] as List<dynamic>? ?? [];
+
+    if (waitingConditions.isEmpty && permanentExclusions.isEmpty && takeaways.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 1. Waiting Period & Permanent Exclusion Screeners
+        if (waitingConditions.isNotEmpty || permanentExclusions.isNotEmpty) ...[
+          _buildWaitingAndExclusionAlerts(
+            waitingConditions: waitingConditions,
+            permanentExclusions: permanentExclusions,
+            isDark: isDark,
+            textColor: textColor,
+            textSecondary: textSecondary,
+          ),
+          const SizedBox(height: 14),
+        ],
+
+        // 2. Actionable Takeaways for Claimant
+        if (takeaways.isNotEmpty) ...[
+          _buildActionableTakeawaysCard(
+            takeaways: takeaways,
+            isDark: isDark,
+            theme: theme,
+            textColor: textColor,
+            textSecondary: textSecondary,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildWaitingAndExclusionAlerts({
+    required List<dynamic> waitingConditions,
+    required List<dynamic> permanentExclusions,
+    required bool isDark,
+    required Color textColor,
+    required Color textSecondary,
+  }) {
+    return Column(
+      children: [
+        for (final item in waitingConditions)
+          Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF321E0B) : const Color(0xFFFFFBEB),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isDark ? Colors.amber.withAlpha(60) : const Color(0xFFFDE68A),
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.schedule_rounded, color: Color(0xFFD97706), size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Standard 2-Year Waiting Period Advisory: ${item['condition']}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.amber.shade200 : const Color(0xFF92400E),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        item['advisory']?.toString() ?? '',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? Colors.grey.shade300 : const Color(0xFF78350F),
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        for (final item in permanentExclusions)
+          Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF2E1215) : const Color(0xFFFEF2F2),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isDark ? Colors.red.withAlpha(60) : const Color(0xFFFECACA),
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Standard Permanent Exclusion #${item['exclusionNumber']}: ${item['title']}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.red.shade200 : const Color(0xFF991B1B),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        item['warning']?.toString() ?? '',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? Colors.grey.shade300 : const Color(0xFF7F1D1D),
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+
+
+  Widget _buildActionableTakeawaysCard({
+    required List<dynamic> takeaways,
+    required bool isDark,
+    required ThemeData theme,
+    required Color textColor,
+    required Color textSecondary,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? Colors.teal.withAlpha(40) : const Color(0xFFBBF7D0),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.tips_and_updates_outlined, color: Color(0xFF059669), size: 20),
+              SizedBox(width: 8),
+              Text(
+                'Key Benchmark Takeaways for Claimant',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF065F46),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          for (final item in takeaways)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('• ', style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF059669))),
+                  Expanded(
+                    child: Text(
+                      item.toString(),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.grey.shade300 : const Color(0xFF064E3B),
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
 }
