@@ -1,3 +1,5 @@
+import 'package:intl/intl.dart';
+
 /// A Coverage Analysis Reports list entry.
 ///
 /// One group = one analysis. When several policies were analysed against the
@@ -8,6 +10,8 @@ class PolicyReportRow {
   final String policyName;
   final String policyNumber;
   final String insuranceCompany;
+  final String policyStartDate;
+  final String policyEndDate;
   final String status;
   final String overallStatus;
   final String outcome;
@@ -24,6 +28,8 @@ class PolicyReportRow {
     required this.policyName,
     required this.policyNumber,
     required this.insuranceCompany,
+    this.policyStartDate = '',
+    this.policyEndDate = '',
     required this.status,
     required this.overallStatus,
     required this.outcome,
@@ -42,6 +48,8 @@ class PolicyReportRow {
       policyName: json['policyName']?.toString() ?? '',
       policyNumber: json['policyNumber']?.toString() ?? '',
       insuranceCompany: json['insuranceCompany']?.toString() ?? '',
+      policyStartDate: json['policyStartDate']?.toString() ?? '',
+      policyEndDate: json['policyEndDate']?.toString() ?? '',
       status: json['status']?.toString() ?? '',
       overallStatus: json['overallStatus']?.toString() ?? '',
       outcome: json['outcome']?.toString() ?? '',
@@ -65,6 +73,28 @@ class PolicyReportRow {
     if (policyName.trim().isNotEmpty) return policyName.trim();
     if (insuranceCompany.trim().isNotEmpty) return insuranceCompany.trim();
     return 'Policy';
+  }
+
+  String get displayPeriod {
+    final start = _formatDateStr(policyStartDate);
+    final end = _formatDateStr(policyEndDate);
+    if (start.isNotEmpty && end.isNotEmpty) {
+      return '$start to $end';
+    }
+    if (start.isNotEmpty) return start;
+    if (end.isNotEmpty) return end;
+    return '';
+  }
+
+  static String _formatDateStr(String raw) {
+    if (raw.trim().isEmpty) return '';
+    try {
+      final dt = DateTime.tryParse(raw);
+      if (dt != null) {
+        return DateFormat('dd-MMM-yyyy').format(dt);
+      }
+    } catch (_) {}
+    return raw;
   }
 
   /// Text for the per-policy status chip.
@@ -136,11 +166,22 @@ class AnalysisReportGroup {
   String get patientName => prescription['patientName']?.toString() ?? '';
   String get visitDate => prescription['visitDate']?.toString() ?? '';
 
+  String get displayVisitDate {
+    if (visitDate.trim().isEmpty) return '';
+    try {
+      final dt = DateTime.tryParse(visitDate);
+      if (dt != null) {
+        return DateFormat('dd-MMM-yyyy').format(dt);
+      }
+    } catch (_) {}
+    return visitDate;
+  }
+
   /// Heading for the group card.
   String get title {
     if (diagnosis.trim().isNotEmpty) return diagnosis.trim();
     if (patientName.trim().isNotEmpty) return patientName.trim();
-    if (!isMultiPolicy && policyReports.isNotEmpty) {
+    if (policyReports.isNotEmpty) {
       final label = policyReports.first.reportLabel;
       if (label.isNotEmpty) return label;
     }
@@ -164,11 +205,6 @@ class AnalysisReportGroup {
       case 'manual_review_required':
         return 'Manual review';
       case 'completed':
-        // A single-policy group shows the coverage decision itself.
-        if (!isMultiPolicy && policyReports.isNotEmpty) {
-          final overall = policyReports.first.overallStatus;
-          if (overall.isNotEmpty) return overall;
-        }
         return 'Completed';
       default:
         return status.isEmpty ? 'Pending' : status;

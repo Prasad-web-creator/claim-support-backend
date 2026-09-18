@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -15,18 +16,35 @@ class UploadPolicyScreen extends StatefulWidget {
   State<UploadPolicyScreen> createState() => _UploadPolicyScreenState();
 }
 
+/// One policy the user has uploaded in this session, with its own start date.
+///
+/// Policies are independent documents, so each keeps its own record id and
+/// date rather than sharing one screen-wide value.
+class _UploadedPolicy {
+  _UploadedPolicy({
+    required this.fileName,
+    required this.fileId,
+    required this.policyId,
+  });
+
+  final String fileName;
+  final String fileId;
+  final String policyId;
+  DateTime? startDate;
+}
+
 class _UploadPolicyScreenState extends State<UploadPolicyScreen> {
-  String? _selectedFileName;
-  String? _uploadedPath;
-  String? _policyId;
-  DateTime? _selectedPolicyStartDate;
+  /// Matches the server's MAX_POLICIES_PER_ANALYSIS limit.
+  static const int _maxPolicies = 5;
+
+  final List<_UploadedPolicy> _policies = [];
   bool _isUploading = false;
 
-  Future<void> _pickStartDate() async {
+  Future<void> _pickStartDate(_UploadedPolicy policy) async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final initialDate = (_selectedPolicyStartDate != null && !_selectedPolicyStartDate!.isAfter(today))
-        ? _selectedPolicyStartDate!
+    final initialDate = (policy.startDate != null && !policy.startDate!.isAfter(today))
+        ? policy.startDate!
         : today;
 
     final DateTime? picked = await showDatePicker(
@@ -34,7 +52,7 @@ class _UploadPolicyScreenState extends State<UploadPolicyScreen> {
       initialDate: initialDate,
       firstDate: DateTime(1970),
       lastDate: today,
-      helpText: 'Select Policy Start Date',
+      helpText: 'Start date for ${policy.fileName}',
       confirmText: 'Confirm',
       cancelText: 'Cancel',
       builder: (context, child) {
@@ -53,152 +71,181 @@ class _UploadPolicyScreenState extends State<UploadPolicyScreen> {
       },
     );
 
-    if (picked != null) {
-      setState(() {
-        _selectedPolicyStartDate = picked;
+    if (picked == null) return;
+
+    setState(() => policy.startDate = picked);
+
+    try {
+      await ApiClient().dio.put('/policies/${policy.policyId}', data: {
+        'policyStartDate': picked.toIso8601String(),
       });
-
-      final prefs = SharedPrefs.instance;
-      await prefs.setString('user_policy_start_date', picked.toIso8601String());
-
-      // If policy record already exists in DB, update it
-      if (_policyId != null) {
-        try {
-          await ApiClient().dio.put('/policies/$_policyId', data: {
-            'policyStartDate': picked.toIso8601String(),
-          });
-        } catch (e) {
-          debugPrint("Failed to update policy start date: $e");
-        }
-      }
+    } catch (e) {
+      debugPrint("Failed to update policy start date: $e");
     }
   }
 
-  Future<void> _pickAndUploadFile() async {
-    FilePickerResult? result = await FilePicker.pickFiles(
+  /// Upload one or more policy documents. Each file becomes its own policy
+  /// record, so the prescription can be compared against all of them.
+  Future<void> _pickAndUploadFiles() async {
+    final remaining = _maxPolicies - _policies.length;
+    if (remaining <= 0) {
+      _toast('You can compare up to $_maxPolicies policies at once.');
+      return;
+    }
+
+    final FilePickerResult? result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'docx'],
+      allowMultiple: true,
     );
 
-    if (result != null && result.files.single.path != null) {
-      setState(() {
-        _selectedFileName = result.files.single.name;
-        _isUploading = true;
+    final picked = result?.files.where((f) => f.path != null).toList() ?? [];
+    if (picked.isEmpty) return;
+
+    var files = picked;
+    if (files.length > remaining) {
+      files = files.sublist(0, remaining);
+      _toast('Only the first $remaining added — you can compare up to $_maxPolicies policies.');
+    }
+
+    setState(() => _isUploading = true);
+    try {
+      for (final file in files) {
+        await _uploadOne(file);
+      }
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
+
+  /// Upload a single file and create its policy record. A failure on one file
+  /// leaves the policies already added untouched.
+  Future<void> _uploadOne(PlatformFile file) async {
+    String? fileId;
+    try {
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(file.path!),
       });
 
-      try {
-        final formData = FormData.fromMap({
-          'file': await MultipartFile.fromFile(result.files.single.path!),
-        });
-
-        final response = await ApiClient().dio.post('/upload', data: formData);
-        
-        if (response.statusCode == 200) {
-          _uploadedPath = response.data['fileId'].toString();
-          final isImageBased = response.data['isImageBased'] == true ||
-              _selectedFileName?.toLowerCase().endsWith('.jpg') == true ||
-              _selectedFileName?.toLowerCase().endsWith('.jpeg') == true ||
-              _selectedFileName?.toLowerCase().endsWith('.png') == true;
-          final prefs = SharedPrefs.instance;
-          await prefs.setString('policy_path', _uploadedPath!);
-          await prefs.setBool('policy_is_image_based', isImageBased);
-          await prefs.remove('policy_id'); // Ensure old policy_id is cleared
-          
-          try {
-            final agreementData = await DeviceAppInfo.buildAgreementData();
-            final policyResponse = await ApiClient().dio.post('/policies', data: {
-              'insuranceCompany': '',
-              'policyNumber': '',
-              'policyName': 'Uploaded Policy',
-              'gridFsFileId': _uploadedPath,
-              'originalFileName': _selectedFileName,
-              'policyStartDate': _selectedPolicyStartDate?.toIso8601String(),
-              'agreement': agreementData,
-            });
-            
-            final newPolicyId = policyResponse.data['_id'] ?? policyResponse.data['id'];
-            _policyId = newPolicyId.toString();
-            await prefs.setString('policy_id', _policyId!);
-            await prefs.remove('policy_path');
-            
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Upload successful')));
-            }
-          } catch (e) {
-            debugPrint("Failed to save policy record: $e");
-            try {
-              await ApiClient().dio.delete('/upload/$_uploadedPath');
-            } catch (deleteError) {
-              debugPrint("Failed to rollback uploaded file: $deleteError");
-            }
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to save policy record. Please try again.')));
-              setState(() {
-                _isUploading = false;
-                _uploadedPath = null;
-              });
-            }
-            return;
-          }
-        }
-      } on DioException catch (e) {
-        if (mounted) {
-          String msg;
-          if (e.type == DioExceptionType.connectionError || e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.receiveTimeout) {
-            msg = "Unable to connect to the server. Please check your internet connection and try again.";
-          } else {
-            msg = "Our servers are experiencing issues processing your upload. Please try again later.";
-          }
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('An unexpected error occurred during upload. Please try again later.')));
-        }
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isUploading = false;
-          });
-        }
+      final response = await ApiClient().dio.post('/upload', data: formData);
+      if (response.statusCode != 200) {
+        _toast('Could not upload ${file.name}.');
+        return;
       }
+
+      fileId = response.data['fileId'].toString();
+      final isImageBased = response.data['isImageBased'] == true ||
+          file.name.toLowerCase().endsWith('.jpg') ||
+          file.name.toLowerCase().endsWith('.jpeg') ||
+          file.name.toLowerCase().endsWith('.png');
+
+      final agreementData = await DeviceAppInfo.buildAgreementData();
+      final policyResponse = await ApiClient().dio.post('/policies', data: {
+        'insuranceCompany': '',
+        'policyNumber': '',
+        'policyName': 'Uploaded Policy',
+        'gridFsFileId': fileId,
+        'originalFileName': file.name,
+        'agreement': agreementData,
+      });
+
+      final newPolicyId =
+          (policyResponse.data['_id'] ?? policyResponse.data['id']).toString();
+
+      await SharedPrefs.instance.setBool('policy_is_image_based', isImageBased);
+
+      if (!mounted) return;
+      setState(() {
+        _policies.add(_UploadedPolicy(
+          fileName: file.name,
+          fileId: fileId!,
+          policyId: newPolicyId,
+        ));
+      });
+    } on DioException catch (e) {
+      await _rollbackUpload(fileId);
+      final offline = e.type == DioExceptionType.connectionError ||
+          e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout;
+      _toast(offline
+          ? 'Unable to connect to the server. Please check your internet connection and try again.'
+          : 'Our servers could not process ${file.name}. Please try again later.');
+    } catch (e) {
+      debugPrint("Failed to save policy record: $e");
+      await _rollbackUpload(fileId);
+      _toast('Could not add ${file.name}. Please try again.');
     }
+  }
+
+  Future<void> _rollbackUpload(String? fileId) async {
+    if (fileId == null) return;
+    try {
+      await ApiClient().dio.delete('/upload/$fileId');
+    } catch (deleteError) {
+      debugPrint("Failed to rollback uploaded file: $deleteError");
+    }
+  }
+
+  Future<void> _removePolicy(_UploadedPolicy policy) async {
+    setState(() => _policies.remove(policy));
+    try {
+      await ApiClient().dio.delete('/policies/${policy.policyId}');
+    } catch (e) {
+      debugPrint("Failed to delete removed policy: $e");
+    }
+  }
+
+  void _toast(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _analyzeDocuments() async {
-    if (_selectedPolicyStartDate == null) {
+    if (_policies.isEmpty) {
+      _toast('Please upload at least one policy document.');
+      return;
+    }
+
+    final missingDate = _policies.where((p) => p.startDate == null).toList();
+    if (missingDate.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select the policy start date before analyzing.'),
+        SnackBar(
+          content: Text(missingDate.length == 1
+              ? 'Please select the start date for ${missingDate.first.fileName}.'
+              : 'Please select a start date for each policy.'),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
 
-    if (_uploadedPath == null && _policyId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please upload a file first.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    // Ensure policy record has latest start date if already uploaded
-    if (_policyId != null && _selectedPolicyStartDate != null) {
+    // Make sure the dates the user picked are stored before the analysis reads them.
+    for (final policy in _policies) {
       try {
-        await ApiClient().dio.put('/policies/$_policyId', data: {
-          'policyStartDate': _selectedPolicyStartDate!.toIso8601String(),
+        await ApiClient().dio.put('/policies/${policy.policyId}', data: {
+          'policyStartDate': policy.startDate!.toIso8601String(),
         });
       } catch (e) {
         debugPrint("Failed to sync policy start date before analysis: $e");
       }
     }
 
-    if (mounted) {
-      context.push('/analysis');
+    final prefs = SharedPrefs.instance;
+    await prefs.remove('policy_path');
+
+    // One policy keeps the original single-analysis flow; several go to the
+    // comparison screen, exactly as selecting saved policies does.
+    if (_policies.length == 1) {
+      await prefs.setString('policy_id', _policies.first.policyId);
+      await prefs.remove('policy_ids');
+      if (mounted) context.push('/analysis');
+    } else {
+      await prefs.setString(
+        'policy_ids',
+        jsonEncode(_policies.map((p) => p.policyId).toList()),
+      );
+      await prefs.remove('policy_id');
+      if (mounted) context.push('/analysis-multi');
     }
   }
 
@@ -278,7 +325,7 @@ class _UploadPolicyScreenState extends State<UploadPolicyScreen> {
               
               // Description
               Text(
-                "Step 3: Upload your current insurance policy document for System extraction.",
+                "Step 3: Upload one or more insurance policy documents. Add several to compare them against the same prescription.",
                 style: TextStyle(
                   color: textSecondary,
                   fontSize: 15,
@@ -287,92 +334,33 @@ class _UploadPolicyScreenState extends State<UploadPolicyScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Policy Start Date Input (Required)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        "Policy Start Date",
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: textColor,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Text(
-                        "*",
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+              // Uploaded policies — each one keeps its own start date, because
+              // the waiting-period checks are per policy.
+              if (_policies.isNotEmpty) ...[
+                Text(
+                  _policies.length == 1
+                      ? "1 policy added"
+                      : "${_policies.length} policies added",
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: textColor,
                   ),
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: _pickStartDate,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF374151) : const Color(0xFFEEF2F6),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: _selectedPolicyStartDate != null
-                              ? primaryBlue
-                              : (isDark ? Colors.grey.shade700 : Colors.grey.shade300),
-                          width: _selectedPolicyStartDate != null ? 1.5 : 1.0,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: primaryBlue.withAlpha(25),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              Icons.calendar_month_rounded,
-                              color: primaryBlue,
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              _selectedPolicyStartDate != null
-                                  ? DateFormat('dd-MM-yyyy').format(_selectedPolicyStartDate!)
-                                  : 'Select Policy Start Date (DD-MM-YYYY)',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: _selectedPolicyStartDate != null
-                                    ? FontWeight.w600
-                                    : FontWeight.w400,
-                                color: _selectedPolicyStartDate != null
-                                    ? textColor
-                                    : textSecondary,
-                              ),
-                            ),
-                          ),
-                          Icon(
-                            Icons.arrow_drop_down,
-                            color: textSecondary,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              
+                ),
+                const SizedBox(height: 12),
+                ..._policies.map((policy) => _buildPolicyTile(
+                      policy: policy,
+                      isDark: isDark,
+                      textColor: textColor,
+                      textSecondary: textSecondary,
+                      primaryBlue: primaryBlue,
+                    )),
+                const SizedBox(height: 12),
+              ],
+
               // Upload Area with Dashed Border
               GestureDetector(
-                onTap: _isUploading ? null : _pickAndUploadFile,
+                onTap: _isUploading ? null : _pickAndUploadFiles,
                 child: CustomPaint(
                   painter: DashedBorderPainter(
                     color: isDark ? Colors.grey.shade600 : Colors.grey.shade400,
@@ -405,7 +393,9 @@ class _UploadPolicyScreenState extends State<UploadPolicyScreen> {
                         ),
                         const SizedBox(height: 24),
                         Text(
-                          _selectedFileName ?? 'Tap to upload PDF or Image',
+                          _policies.isEmpty
+                              ? 'Tap to upload PDF or Image'
+                              : 'Tap to add another policy',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -414,7 +404,8 @@ class _UploadPolicyScreenState extends State<UploadPolicyScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          _selectedFileName == null ? 'Max file size: 10MB' : 'File uploaded successfully',
+                          'You can select several files at once · up to $_maxPolicies policies · max 10MB each',
+                          textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 13,
                             color: textSecondary,
@@ -452,16 +443,18 @@ class _UploadPolicyScreenState extends State<UploadPolicyScreen> {
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
+                    children: [
                       Text(
-                        'Analyze Documents',
-                        style: TextStyle(
+                        _policies.length > 1
+                            ? 'Compare ${_policies.length} Policies'
+                            : 'Analyze Documents',
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      SizedBox(width: 8),
-                      Icon(Icons.show_chart, size: 20),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.show_chart, size: 20),
                     ],
                   ),
                 ),
@@ -469,6 +462,92 @@ class _UploadPolicyScreenState extends State<UploadPolicyScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// One uploaded policy: its file name, its own start date and a way to drop it.
+  Widget _buildPolicyTile({
+    required _UploadedPolicy policy,
+    required bool isDark,
+    required Color textColor,
+    required Color textSecondary,
+    required Color primaryBlue,
+  }) {
+    final hasDate = policy.startDate != null;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF374151) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: hasDate
+              ? primaryBlue
+              : (isDark ? Colors.grey.shade700 : Colors.grey.shade300),
+          width: hasDate ? 1.5 : 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.description_outlined, size: 18, color: primaryBlue),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  policy.fileName,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: textColor,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: () => _removePolicy(policy),
+                icon: const Icon(Icons.close, size: 18),
+                color: textSecondary,
+                tooltip: 'Remove',
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Required per policy: waiting periods are judged against this date.
+          GestureDetector(
+            onTap: () => _pickStartDate(policy),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1F2937) : const Color(0xFFEEF2F6),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.calendar_month_rounded, size: 18, color: primaryBlue),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      hasDate
+                          ? 'Start date: ${DateFormat('dd-MM-yyyy').format(policy.startDate!)}'
+                          : 'Select policy start date *',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: hasDate ? FontWeight.w600 : FontWeight.w400,
+                        color: hasDate ? textColor : Colors.red.shade400,
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.arrow_drop_down, color: textSecondary),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

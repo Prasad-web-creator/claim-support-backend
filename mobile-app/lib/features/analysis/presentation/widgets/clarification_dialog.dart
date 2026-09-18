@@ -609,9 +609,17 @@ class ClarificationDialog extends StatefulWidget {
   final Function(Map<String, dynamic>) onSubmit;
   final VoidCallback onCancel;
 
-  /// Optional subtitle naming which policy is asking (multi-policy analysis).
+  /// Name of the policy these questions belong to (multi-policy analysis).
   /// Omitted for single-policy analysis, which keeps its original wording.
   final String? contextLabel;
+
+  /// Insurer behind that policy, shown under its name to tell apart two
+  /// similarly named policies.
+  final String? contextSubLabel;
+
+  /// e.g. "1 of 2 policies need your input" — only when more than one policy is
+  /// waiting, so the user knows another question follows.
+  final String? queueLabel;
 
   const ClarificationDialog({
     super.key,
@@ -619,6 +627,8 @@ class ClarificationDialog extends StatefulWidget {
     required this.onSubmit,
     required this.onCancel,
     this.contextLabel,
+    this.contextSubLabel,
+    this.queueLabel,
   });
 
   @override
@@ -784,7 +794,7 @@ class _ClarificationDialogState extends State<ClarificationDialog> {
                         const SizedBox(height: 2),
                         Text(
                           widget.contextLabel != null
-                              ? 'For ${widget.contextLabel}. Other policies are unaffected.'
+                              ? 'These questions are about one policy only.'
                               : 'Answer to complete your coverage analysis.',
                           style: TextStyle(fontSize: 12, color: textSecondary),
                         ),
@@ -794,6 +804,65 @@ class _ClarificationDialogState extends State<ClarificationDialog> {
                 ],
               ),
             ),
+
+            // ── Which policy is asking ───────────────────────────────
+            // In a multi-policy comparison the answers only apply to this one
+            // policy, so it is named up front rather than in fine print.
+            if (widget.contextLabel != null)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+                decoration: BoxDecoration(
+                  color: primaryColor.withAlpha(isDark ? 38 : 20),
+                  border: Border(
+                    bottom: BorderSide(color: Colors.grey.withAlpha(38)),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.shield_outlined, size: 18, color: primaryColor),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Asked about this policy',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.3,
+                              color: textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            widget.contextLabel!,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: textColor,
+                            ),
+                          ),
+                          if ((widget.contextSubLabel ?? '').isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              widget.contextSubLabel!,
+                              style: TextStyle(fontSize: 12, color: textSecondary),
+                            ),
+                          ],
+                          const SizedBox(height: 6),
+                          Text(
+                            widget.queueLabel ?? 'Your other policies are unaffected.',
+                            style: TextStyle(fontSize: 11, color: textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
             // ── Scrollable Questions ─────────────────────────────────
             Flexible(

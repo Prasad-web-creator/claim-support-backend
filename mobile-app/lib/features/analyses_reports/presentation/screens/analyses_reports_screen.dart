@@ -5,11 +5,10 @@ import 'package:intl/intl.dart';
 import 'package:claimsupport/features/analysis_reports/presentation/controllers/analysis_report_controller.dart';
 import 'package:claimsupport/features/analysis_reports/data/models/analysis_report_group.dart';
 
-/// Coverage Analysis Reports.
+/// Coverage Analysis Reports screen.
 ///
-/// One card per analysis. When several policies were analysed against the same
-/// prescription they appear inside a single card — one row per policy, each
-/// keeping its own status, coverage result and report.
+/// Groups policies analyzed against the same prescription under one clean,
+/// expandable parent report card matching the reference design.
 class AnalysesReportsScreen extends ConsumerStatefulWidget {
   const AnalysesReportsScreen({super.key});
 
@@ -22,6 +21,7 @@ class _AnalysesReportsScreenState extends ConsumerState<AnalysesReportsScreen> {
 
   bool _isSelectionMode = false;
   final Set<String> _selectedGroupIds = {};
+  final Set<String> _expandedGroupIds = {};
 
   void _enterSelectionMode([String? initialId]) {
     setState(() {
@@ -60,6 +60,16 @@ class _AnalysesReportsScreenState extends ConsumerState<AnalysesReportsScreen> {
         _isSelectionMode = false;
       } else {
         _selectedGroupIds.addAll(allIds);
+      }
+    });
+  }
+
+  void _toggleExpand(String groupId) {
+    setState(() {
+      if (_expandedGroupIds.contains(groupId)) {
+        _expandedGroupIds.remove(groupId);
+      } else {
+        _expandedGroupIds.add(groupId);
       }
     });
   }
@@ -155,41 +165,43 @@ class _AnalysesReportsScreenState extends ConsumerState<AnalysesReportsScreen> {
     }
   }
 
-  Color _statusColor(String label) {
-    final lower = label.toLowerCase();
-    if (lower.contains('fail') || lower.contains('invalid')) return Colors.redAccent;
-    if (lower.contains('needs your input') || lower.contains('partial') ||
-        lower.contains('manual review')) {
-      return Colors.orange;
-    }
-    if (lower.contains('not covered') || lower.contains('rejected')) return Colors.red;
-    if (lower.contains('analyzing')) return Colors.blueGrey;
-    if (lower.contains('covered') || lower.contains('completed')) return Colors.green;
-    return Colors.grey;
-  }
-
   @override
   Widget build(BuildContext context) {
     final reportState = ref.watch(analysisReportProvider);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
+    // Every group starts collapsed: a card opens only when the user taps it.
     final currentGroups = reportState.value?.docs ?? [];
+
     final validIds = currentGroups.map((g) => g.groupId).toSet();
     final allSelected = validIds.isNotEmpty && _selectedGroupIds.containsAll(validIds);
 
     return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
+        elevation: 0,
+        backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
         leading: _isSelectionMode
             ? IconButton(
                 icon: const Icon(Icons.close_rounded),
                 onPressed: _exitSelectionMode,
                 tooltip: 'Cancel Selection',
               )
-            : null,
+            : (Navigator.of(context).canPop()
+                ? IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    tooltip: 'Back',
+                  )
+                : null),
         title: Text(
           _isSelectionMode ? '${_selectedGroupIds.length} Selected' : 'Coverage Analysis Reports',
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+          ),
         ),
         actions: [
           if (_isSelectionMode) ...[
@@ -200,34 +212,46 @@ class _AnalysesReportsScreenState extends ConsumerState<AnalysesReportsScreen> {
                 style: TextStyle(
                   color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
                   fontWeight: FontWeight.w600,
+                  fontSize: 14,
                 ),
               ),
             ),
-            IconButton(
-              icon: Icon(
-                Icons.delete_outline_rounded,
-                color: _selectedGroupIds.isNotEmpty ? Colors.redAccent : Colors.grey,
+            Padding(
+              padding: const EdgeInsets.only(right: 6.0),
+              child: IconButton(
+                icon: Icon(
+                  Icons.delete_outline_rounded,
+                  color: _selectedGroupIds.isNotEmpty ? Colors.redAccent : Colors.redAccent.withAlpha(110),
+                ),
+                tooltip: 'Delete Selected',
+                onPressed: _selectedGroupIds.isNotEmpty ? _confirmBatchDelete : null,
               ),
-              tooltip: 'Delete Selected',
-              onPressed: _selectedGroupIds.isNotEmpty ? _confirmBatchDelete : null,
             ),
           ] else ...[
-            IconButton(
-              icon: const Icon(Icons.checklist_rounded),
-              tooltip: 'Select Multiple',
-              onPressed: () => _enterSelectionMode(),
+            Padding(
+              padding: const EdgeInsets.only(right: 6.0),
+              child: IconButton(
+                icon: const Icon(Icons.tune_rounded),
+                tooltip: 'Select / Manage',
+                onPressed: () => _enterSelectionMode(),
+              ),
             ),
           ],
         ],
       ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           child: reportState.when(
             data: (pagination) {
               final groups = pagination.docs;
               if (groups.isEmpty) {
-                return const Center(child: Text('No analysis reports found.'));
+                return const Center(
+                  child: Text(
+                    'No analysis reports found.',
+                    style: TextStyle(color: Colors.grey, fontSize: 15),
+                  ),
+                );
               }
 
               return RefreshIndicator(
@@ -262,260 +286,455 @@ class _AnalysesReportsScreenState extends ConsumerState<AnalysesReportsScreen> {
 
   Widget _buildGroupCard(AnalysisReportGroup group, bool isDark) {
     final isSelected = _selectedGroupIds.contains(group.groupId);
+    final isExpanded = _expandedGroupIds.contains(group.groupId);
     final statusLabel = group.statusLabel;
-    final statusColor = _statusColor(statusLabel);
 
     final dateStr = group.createdAt != null
-        ? DateFormat('dd-MM-yyyy h:mm a').format(group.createdAt!.toLocal())
-        : null;
+        ? DateFormat('dd-MM-yyyy  h:mm a').format(group.createdAt!.toLocal())
+        : '';
 
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 16),
-      color: isSelected
-          ? (isDark ? const Color(0xFF1E3A8A).withAlpha(40) : const Color(0xFFEFF6FF))
-          : (isDark ? const Color(0xFF1E2230) : Colors.white),
-      shape: RoundedRectangleBorder(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? (isDark ? const Color(0xFF1E3A8A).withAlpha(40) : const Color(0xFFEFF6FF))
+            : (isDark ? const Color(0xFF1E293B) : Colors.white),
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
+        border: Border.all(
           color: isSelected
               ? _primaryBlue
-              : (isDark ? Colors.grey.shade800 : Colors.grey.shade300),
+              : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
           width: isSelected ? 1.5 : 1.0,
         ),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onLongPress: () => _enterSelectionMode(group.groupId),
-        onTap: () {
-          if (_isSelectionMode) {
-            _toggleSelection(group.groupId);
-            return;
-          }
-          // A single-policy analysis opens its report directly; a multi-policy
-          // analysis is expanded in place, one row per policy.
-          if (!group.isMultiPolicy && group.policyReports.isNotEmpty) {
-            final reportId = group.policyReports.first.reportId;
-            if (reportId.isNotEmpty) context.push('/summary/$reportId');
-          }
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_isSelectionMode)
-                Padding(
-                  padding: const EdgeInsets.only(right: 12, top: 2),
-                  child: Checkbox(
-                    value: isSelected,
-                    activeColor: _primaryBlue,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                    onChanged: (_) => _toggleSelection(group.groupId),
-                  ),
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withAlpha(6),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
                 ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onLongPress: () => _enterSelectionMode(group.groupId),
+          onTap: () {
+            if (_isSelectionMode) {
+              _toggleSelection(group.groupId);
+            } else {
+              _toggleExpand(group.groupId);
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Line 1: Header Icons & Status Row ───────────────────────
+                Row(
                   children: [
-                    // ── Group header ────────────────────────────────────────
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            group.isMultiPolicy
-                                ? group.title
-                                : (group.policyReports.isNotEmpty &&
-                                        group.policyReports.first.reportLabel.isNotEmpty
-                                    ? group.policyReports.first.reportLabel
-                                    : group.title),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    if (_isSelectionMode)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Checkbox(
+                          value: isSelected,
+                          activeColor: _primaryBlue,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                          onChanged: (_) => _toggleSelection(group.groupId),
+                        ),
+                      ),
+
+                    // File Icon Box
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          Icons.description_outlined,
+                          color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
+                          size: 19,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+
+                    // Status Pill (e.g. Completed)
+                    _buildStatusPill(statusLabel),
+
+                    const Spacer(),
+
+                    // Dropdown / Expand Icon
+                    InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () => _toggleExpand(group.groupId),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4.0),
+                        child: Icon(
+                          isExpanded
+                              ? Icons.keyboard_arrow_up_rounded
+                              : Icons.keyboard_arrow_down_rounded,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                          size: 22,
+                        ),
+                      ),
+                    ),
+
+                    if (!_isSelectionMode) ...[
+                      const SizedBox(width: 6),
+                      // Delete Icon
+                      InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: () => _confirmDeleteSingle(group),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4.0),
+                          child: Icon(
+                            Icons.delete_outline_rounded,
+                            color: Colors.redAccent,
+                            size: 20,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        _buildChip(statusLabel, statusColor),
-                        if (!_isSelectionMode) ...[
-                          const SizedBox(width: 8),
-                          IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 22),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            onPressed: () => _confirmDeleteSingle(group),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-
-                    if (group.isMultiPolicy) ...[
-                      if (group.patientName.isNotEmpty)
-                        _buildTextRow('Patient Name', group.patientName, isDark: isDark),
-                      if (group.visitDate.isNotEmpty)
-                        _buildTextRow('Prescription Date', group.visitDate, isDark: isDark),
-                      _buildTextRow('Policies Analyzed', '${group.policyCount}', isDark: isDark),
-                      if (dateStr != null)
-                        _buildTextRow('Analyzed DateTime', dateStr, isDark: isDark),
-                      if (group.displayProcessingTime.isNotEmpty)
-                        _buildTextRow('Analyzed time', group.displayProcessingTime, isDark: isDark),
-
-                      const SizedBox(height: 6),
-                      Divider(color: isDark ? Colors.grey.shade800 : Colors.grey.shade300),
-                      const SizedBox(height: 2),
-
-                      // ── One row per policy, each independent ──────────────
-                      ...group.policyReports.map((p) => _buildPolicyRow(p, isDark)),
-                    ] else ...[
-                      // Single-policy analysis keeps its original layout
-                      if (group.policyReports.isNotEmpty) ...[
-                        if (group.policyReports.first.displayName.isNotEmpty &&
-                            group.policyReports.first.displayName != 'Policy')
-                          _buildTextRow('Policy Name', group.policyReports.first.displayName,
-                              isDark: isDark),
-                        if (group.patientName.isNotEmpty)
-                          _buildTextRow('Patient Name', group.patientName, isDark: isDark),
-                        _buildTextRow('Dominance score',
-                            '${group.policyReports.first.dominanceScore}%', isDark: isDark),
-                      ],
-                      if (dateStr != null)
-                        _buildTextRow('Analyzed DateTime', dateStr, isDark: isDark),
-                      if (group.displayProcessingTime.isNotEmpty)
-                        _buildTextRow('Analyzed time', group.displayProcessingTime, isDark: isDark),
+                      ),
                     ],
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 10),
+
+                // ── Line 2: Full Width Diagnosis Title ──────────────────────
+                Text(
+                  group.title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    height: 1.3,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // ── Line 3+: Metadata Rows ──────────────────────────────────
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (group.patientName.isNotEmpty)
+                      _buildMetaRow(
+                        Icons.calendar_today_outlined,
+                        'Patient Name',
+                        group.patientName,
+                        isDark,
+                      ),
+                    if (group.displayVisitDate.isNotEmpty)
+                      _buildMetaRow(
+                        Icons.calendar_today_outlined,
+                        'Prescription Date',
+                        group.displayVisitDate,
+                        isDark,
+                      )
+                    else if (group.visitDate.isNotEmpty)
+                      _buildMetaRow(
+                        Icons.calendar_today_outlined,
+                        'Prescription Date',
+                        group.visitDate,
+                        isDark,
+                      ),
+                    _buildMetaRow(
+                      Icons.description_outlined,
+                      'Policies Analyzed',
+                      '${group.policyCount}',
+                      isDark,
+                    ),
+                    if (dateStr.isNotEmpty)
+                      _buildMetaRow(
+                        Icons.access_time_rounded,
+                        'Analyzed DateTime',
+                        dateStr,
+                        isDark,
+                      ),
+                    if (group.displayProcessingTime.isNotEmpty)
+                      _buildMetaRow(
+                        Icons.access_time_rounded,
+                        'Proccessed time',
+                        group.displayProcessingTime,
+                        isDark,
+                      ),
+                  ],
+                ),
+
+                // ── Nested Policies (Visible when expanded) ──────────────────
+                if (isExpanded && group.policyReports.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Divider(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                    thickness: 1,
+                    height: 1,
+                  ),
+                  const SizedBox(height: 12),
+                  ...group.policyReports.map((p) => _buildNestedPolicyCard(p, isDark)),
+                ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  /// One policy inside a grouped analysis — its own status, coverage and report.
-  Widget _buildPolicyRow(PolicyReportRow policy, bool isDark) {
-    final statusColor = _statusColor(policy.statusLabel);
-    final subColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+  /// Nested policy card matching user specification: Shield Icon, Coverage status, Right arrow on Line 1, Policy details on Line 2+, View Details > removed.
+  Widget _buildNestedPolicyCard(PolicyReportRow policy, bool isDark) {
+    final subColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF151A26) : const Color(0xFFF9FAFB),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF151D2A) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2E3D52) : const Color(0xFFE2E8F0),
+          width: 1,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () {
+            if (policy.hasReport) {
+              context.push('/summary/${policy.reportId}');
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        policy.displayName,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: isDark ? Colors.white : const Color(0xFF111827),
+                // ── Line 1: Shield Icon  Coverage status  Right side arrow icon ──
+                Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          Icons.shield_outlined,
+                          color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
+                          size: 17,
                         ),
                       ),
-                      if (policy.policyNumber.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text('Policy No: ${policy.policyNumber}',
-                            style: TextStyle(fontSize: 11, color: subColor)),
-                      ] else if (policy.insuranceCompany.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(policy.insuranceCompany,
-                            style: TextStyle(fontSize: 11, color: subColor)),
-                      ],
-                    ],
+                    ),
+                    const SizedBox(width: 8),
+                    _buildPolicyStatusPill(policy.statusLabel),
+                    const Spacer(),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 20,
+                      color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // ── Line 2+: Full Width Policy Name & Details ────────────────
+                Text(
+                  policy.displayName,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
                   ),
                 ),
-                const SizedBox(width: 8),
-                _buildChip(policy.statusLabel, statusColor, small: true),
-              ],
-            ),
-
-            if (policy.isFailed && policy.errorMessage.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(
-                policy.errorMessage,
-                style: const TextStyle(fontSize: 11, color: Colors.redAccent),
-              ),
-            ],
-
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                if (policy.reportLabel.isNotEmpty)
-                  Text(policy.reportLabel, style: TextStyle(fontSize: 11, color: subColor)),
-                if (policy.reportLabel.isNotEmpty && policy.dominanceScore > 0)
-                  Text('  ·  ', style: TextStyle(fontSize: 11, color: subColor)),
-                if (policy.dominanceScore > 0)
-                  Text('Dominance ${policy.dominanceScore}%',
-                      style: TextStyle(fontSize: 11, color: subColor)),
-                const Spacer(),
-                if (policy.hasReport)
-                  TextButton(
-                    onPressed: () => context.push('/summary/${policy.reportId}'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: _primaryBlue,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      minimumSize: const Size(0, 30),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    Icon(Icons.description_outlined, size: 12, color: subColor),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        policy.policyNumber.isNotEmpty
+                            ? 'Policy No: ${policy.policyNumber}'
+                            : (policy.insuranceCompany.isNotEmpty
+                                ? policy.insuranceCompany
+                                : 'Policy No: ---'),
+                        style: TextStyle(fontSize: 12, color: subColor),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    child: const Text('View Details', style: TextStyle(fontSize: 12)),
+                  ],
+                ),
+                if (policy.displayPeriod.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Icon(Icons.calendar_today_outlined, size: 12, color: subColor),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          'Period: ${policy.displayPeriod}',
+                          style: TextStyle(fontSize: 12, color: subColor),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
+                ],
+
+                if (policy.isFailed && policy.errorMessage.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    policy.errorMessage,
+                    style: const TextStyle(fontSize: 11, color: Colors.redAccent),
+                  ),
+                ],
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildChip(String label, Color color, {bool small = false}) {
+  /// Status badge for parent analysis header (Completed, Analyzing, Failed, etc.).
+  Widget _buildStatusPill(String label) {
+    final lower = label.toLowerCase();
+    Color bg;
+    Color fg;
+    IconData icon;
+
+    if (lower.contains('fail') || lower.contains('invalid')) {
+      bg = const Color(0xFFFEE2E2);
+      fg = const Color(0xFFDC2626);
+      icon = Icons.cancel_rounded;
+    } else if (lower.contains('needs your input') ||
+        lower.contains('partial') ||
+        lower.contains('manual review') ||
+        lower.contains('review')) {
+      bg = const Color(0xFFFEF3C7);
+      fg = const Color(0xFFD97706);
+      icon = Icons.error_outline_rounded;
+    } else if (lower.contains('not covered') || lower.contains('rejected')) {
+      bg = const Color(0xFFFEE2E2);
+      fg = const Color(0xFFDC2626);
+      icon = Icons.cancel_rounded;
+    } else if (lower.contains('analyzing') || lower.contains('queued') || lower.contains('extracting')) {
+      bg = const Color(0xFFF1F5F9);
+      fg = const Color(0xFF475569);
+      icon = Icons.hourglass_empty_rounded;
+    } else {
+      bg = const Color(0xFFE8F8F0);
+      fg = const Color(0xFF15803D);
+      icon = Icons.check_circle_rounded;
+    }
+
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: small ? 8 : 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
       decoration: BoxDecoration(
-        color: color.withAlpha(25),
+        color: bg,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withAlpha(128)),
       ),
-      child: Text(
-        label,
-        style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: small ? 11 : 12),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: fg),
+          const SizedBox(width: 3.5),
+          Text(
+            label,
+            style: TextStyle(color: fg, fontWeight: FontWeight.w600, fontSize: 11),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildTextRow(String? label, String? value, {Color? color, bool isDark = false}) {
-    if (value == null || value.trim().isEmpty || value.trim() == '---' || value.trim() == 'N/A') {
+  /// Policy status pill (Covered, Not Covered, etc.) with icons matching reference UI.
+  Widget _buildPolicyStatusPill(String label) {
+    final lower = label.toLowerCase();
+    Color bg;
+    Color fg;
+    IconData icon;
+
+    if (lower.contains('not covered') || lower.contains('fail') || lower.contains('rejected')) {
+      bg = const Color(0xFFFEE2E2);
+      fg = const Color(0xFFDC2626);
+      icon = Icons.cancel_rounded;
+    } else if (lower.contains('needs your input') || lower.contains('manual review') || lower.contains('review')) {
+      bg = const Color(0xFFFEF3C7);
+      fg = const Color(0xFFD97706);
+      icon = Icons.error_outline_rounded;
+    } else if (lower.contains('analyzing') || lower.contains('queued')) {
+      bg = const Color(0xFFF1F5F9);
+      fg = const Color(0xFF475569);
+      icon = Icons.hourglass_empty_rounded;
+    } else {
+      bg = const Color(0xFFE8F8F0);
+      fg = const Color(0xFF15803D);
+      icon = Icons.check_circle_rounded;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7.5, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: fg),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(color: fg, fontWeight: FontWeight.w600, fontSize: 10.5),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Clean metadata text row with leading icon matching Image 2 reference UI.
+  Widget _buildMetaRow(IconData icon, String label, String value, bool isDark) {
+    if (value.trim().isEmpty || value.trim() == '---' || value.trim() == 'N/A') {
       return const SizedBox.shrink();
     }
-    final defaultColor = isDark ? Colors.grey.shade300 : Colors.black87;
+    final labelColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final valueColor = isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155);
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6.0),
-      child: label == null
-          ? Text(value,
-              style: TextStyle(
-                  color: color ?? defaultColor,
-                  fontSize: 14,
-                  fontWeight: color != null ? FontWeight.bold : FontWeight.normal))
-          : RichText(
-              text: TextSpan(
-                style: TextStyle(fontSize: 14, color: defaultColor),
-                children: [
-                  TextSpan(text: '$label : ', style: const TextStyle(fontWeight: FontWeight.w600)),
-                  TextSpan(text: value, style: TextStyle(color: color ?? defaultColor)),
-                ],
-              ),
+      padding: const EdgeInsets.only(bottom: 5.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(icon, size: 14, color: labelColor),
+          const SizedBox(width: 8),
+          Text(
+            '$label:  ',
+            style: TextStyle(
+              fontSize: 12.5,
+              color: labelColor,
+              fontWeight: FontWeight.w400,
             ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12.5,
+                color: valueColor,
+                fontWeight: FontWeight.w500,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

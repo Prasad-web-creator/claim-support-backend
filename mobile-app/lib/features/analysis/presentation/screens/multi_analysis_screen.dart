@@ -67,12 +67,22 @@ class _MultiAnalysisScreenState extends ConsumerState<MultiAnalysisScreen> {
     _dialogShowing = true;
     _answeringPolicyId = pending.policyId;
 
+    // With several policies in flight, say plainly which one is asking and
+    // whether another policy is still waiting behind this one.
+    final waiting = session.policyAnalyses.where((p) => p.isWaitingForUser).toList();
+    final position = waiting.indexWhere((p) => p.policyId == pending.policyId) + 1;
+    final queueLabel = waiting.length > 1
+        ? 'Policy $position of ${waiting.length} waiting for your input'
+        : null;
+
     showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => ClarificationDialog(
         clarificationData: {'questions': pending.questions},
         contextLabel: pending.displayName,
+        contextSubLabel: pending.insuranceCompany,
+        queueLabel: queueLabel,
         onSubmit: (answers) {
           Navigator.of(dialogContext).pop();
           _dialogShowing = false;
@@ -143,6 +153,9 @@ class _MultiAnalysisScreenState extends ConsumerState<MultiAnalysisScreen> {
     );
   }
 
+  /// Shown only while the session itself is being created — a single request,
+  /// with genuinely nothing to measure yet. Once it returns, every indicator on
+  /// this screen is driven by steps the backend reports as finished.
   Widget _buildLoading(bool isDark) {
     return Center(
       child: Column(
@@ -151,19 +164,84 @@ class _MultiAnalysisScreenState extends ConsumerState<MultiAnalysisScreen> {
           const CircularProgressIndicator(color: _primaryBlue),
           const SizedBox(height: 20),
           Text(
-            'Analyzing your prescription against each policy…',
+            'Setting up your comparison…',
             style: TextStyle(
               fontSize: 14,
               color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
             ),
           ),
-          const SizedBox(height: 6),
+        ],
+      ),
+    );
+  }
+
+  /// Session-wide progress: steps the backend has actually completed out of the
+  /// steps it plans to run. No value here is estimated or time-driven, and when
+  /// the server reports no counts the bar falls back to indeterminate rather
+  /// than showing a number it cannot stand behind.
+  Widget _buildProgressCard(bool isDark, MultiAnalysisSession session) {
+    final textColor = isDark ? Colors.white : const Color(0xFF111827);
+    final subColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+    final progress = session.progress;
+    final fraction = progress.fraction;
+    final blocked = session.isBlockedOnUser;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1F2937) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                blocked ? Icons.help_outline : Icons.sync,
+                size: 18,
+                color: blocked ? Colors.orange : _primaryBlue,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  progress.label.isNotEmpty
+                      ? progress.label
+                      : (blocked ? 'Waiting for your answer' : 'Working…'),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: textColor,
+                  ),
+                ),
+              ),
+              if (progress.isKnown)
+                _AnimatedPercentText(
+                  value: fraction ?? 0,
+                  color: blocked ? Colors.orange : _primaryBlue,
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _AnimatedProgressBar(
+            value: fraction,
+            height: 6,
+            radius: 4,
+            color: blocked ? Colors.orange : _primaryBlue,
+            backgroundColor: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+          ),
+          const SizedBox(height: 10),
           Text(
-            'This can take a moment for several policies.',
-            style: TextStyle(
-              fontSize: 12,
-              color: isDark ? Colors.grey.shade600 : Colors.grey.shade500,
-            ),
+            progress.isKnown
+                ? '${progress.completedSteps} of ${progress.totalSteps} steps done · '
+                    '${session.completedCount}/${session.policyCount} '
+                    '${session.policyCount == 1 ? 'policy' : 'policies'} finished'
+                : 'Following the analysis…',
+            style: TextStyle(fontSize: 12, color: subColor),
           ),
         ],
       ),
@@ -260,14 +338,18 @@ class _MultiAnalysisScreenState extends ConsumerState<MultiAnalysisScreen> {
               const SizedBox(height: 10),
               Text(
                 'Analyzed against ${session.policyCount} '
-                '${session.policyCount == 1 ? 'policy' : 'policies'} · '
-                '${session.completedCount}/${session.policyCount} finished',
+                '${session.policyCount == 1 ? 'policy' : 'policies'}',
                 style: TextStyle(fontSize: 12, color: subColor),
               ),
             ],
           ),
         ),
         const SizedBox(height: 16),
+
+        // Only while something is actually outstanding — a finished comparison
+        // has no progress left to report.
+        if (session.isWorking || session.isBlockedOnUser)
+          _buildProgressCard(isDark, session),
 
         Text(
           'Policies',
@@ -355,15 +437,28 @@ class _MultiAnalysisScreenState extends ConsumerState<MultiAnalysisScreen> {
             ),
           ],
 
+          // What this policy is doing, and how far through its own steps it is.
+          if (policy.isRunning) ...[
+            const SizedBox(height: 10),
+            _AnimatedProgressBar(
+              value: policy.stepProgress,
+              height: 4,
+              radius: 3,
+              color: _primaryBlue,
+              backgroundColor: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              policy.totalSteps > 0
+                  ? '${policy.progressLabel} · step ${policy.completedSteps + 1} of ${policy.totalSteps}'
+                  : policy.progressLabel,
+              style: TextStyle(fontSize: 11, color: subColor),
+            ),
+          ],
+
           const SizedBox(height: 12),
           Row(
             children: [
-              if (policy.isRunning)
-                const SizedBox(
-                  height: 16,
-                  width: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: _primaryBlue),
-                ),
               if (policy.isWaitingForUser)
                 TextButton.icon(
                   onPressed: () => _maybeShowClarification(session),
@@ -424,6 +519,74 @@ class _MultiAnalysisScreenState extends ConsumerState<MultiAnalysisScreen> {
       child: Text(
         policy.statusLabel,
         style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
+      ),
+    );
+  }
+}
+
+/// A progress bar that travels to each new value instead of snapping to it.
+///
+/// The target is always the real, server-reported fraction — the animation only
+/// covers the distance between two true readings, so the bar never moves ahead
+/// of the work. A null value means the backend reported no step counts and the
+/// bar stays indeterminate rather than showing an invented position.
+class _AnimatedProgressBar extends StatelessWidget {
+  const _AnimatedProgressBar({
+    required this.value,
+    required this.height,
+    required this.radius,
+    required this.color,
+    required this.backgroundColor,
+  });
+
+  final double? value;
+  final double height;
+  final double radius;
+  final Color color;
+  final Color backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final bar = value == null
+        ? LinearProgressIndicator(
+            minHeight: height,
+            backgroundColor: backgroundColor,
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+          )
+        : TweenAnimationBuilder<double>(
+            // Re-targeting mid-flight continues from where the bar currently
+            // is, so consecutive updates read as one continuous movement.
+            tween: Tween<double>(end: value!.clamp(0.0, 1.0)),
+            duration: const Duration(milliseconds: 900),
+            curve: Curves.easeOutCubic,
+            builder: (context, animated, _) => LinearProgressIndicator(
+              value: animated,
+              minHeight: height,
+              backgroundColor: backgroundColor,
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+            ),
+          );
+
+    return ClipRRect(borderRadius: BorderRadius.circular(radius), child: bar);
+  }
+}
+
+/// The percentage counts up in step with the bar, so the two never disagree.
+class _AnimatedPercentText extends StatelessWidget {
+  const _AnimatedPercentText({required this.value, required this.color});
+
+  final double value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(end: value.clamp(0.0, 1.0)),
+      duration: const Duration(milliseconds: 900),
+      curve: Curves.easeOutCubic,
+      builder: (context, animated, _) => Text(
+        '${(animated * 100).round()}%',
+        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color),
       ),
     );
   }

@@ -180,19 +180,25 @@ class _PolicyListScreenState extends ConsumerState<PolicyListScreen> {
                 ),
               ),
             ),
-            IconButton(
-              icon: Icon(
-                Icons.delete_outline_rounded,
-                color: _selectedPolicyIds.isNotEmpty ? Colors.redAccent : Colors.grey,
+            Padding(
+              padding: const EdgeInsets.only(right: 6.0),
+              child: IconButton(
+                icon: Icon(
+                  Icons.delete_outline_rounded,
+                  color: _selectedPolicyIds.isNotEmpty ? Colors.redAccent : Colors.redAccent.withAlpha(110),
+                ),
+                tooltip: 'Delete Selected',
+                onPressed: _selectedPolicyIds.isNotEmpty ? _confirmBatchDelete : null,
               ),
-              tooltip: 'Delete Selected',
-              onPressed: _selectedPolicyIds.isNotEmpty ? _confirmBatchDelete : null,
             ),
           ] else ...[
-            IconButton(
-              icon: const Icon(Icons.checklist_rounded),
-              tooltip: 'Select Multiple',
-              onPressed: () => _enterSelectionMode(),
+            Padding(
+              padding: const EdgeInsets.only(right: 6.0),
+              child: IconButton(
+                icon: const Icon(Icons.checklist_rounded),
+                tooltip: 'Select Multiple',
+                onPressed: () => _enterSelectionMode(),
+              ),
             ),
           ],
         ],
