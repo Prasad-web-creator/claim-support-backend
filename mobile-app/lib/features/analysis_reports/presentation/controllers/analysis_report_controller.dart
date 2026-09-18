@@ -1,37 +1,37 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:claimsupport/core/providers.dart';
-import 'package:claimsupport/features/analysis_reports/data/models/analysis_report.dart';
+import 'package:claimsupport/features/analysis_reports/data/models/analysis_report_group.dart';
 import 'package:claimsupport/core/models/pagination_response.dart';
 
-class AnalysisReportNotifier extends AsyncNotifier<PaginationResponse<AnalysisReport>> {
+/// Drives the Coverage Analysis Reports list.
+///
+/// Each item is an analysis *group*: a multi-policy analysis carries all of its
+/// policy results, a single-policy analysis is a group of one.
+class AnalysisReportNotifier extends AsyncNotifier<PaginationResponse<AnalysisReportGroup>> {
   int _currentPage = 1;
-  String _currentSearch = '';
 
   static const int _limit = 10;
 
   @override
-  Future<PaginationResponse<AnalysisReport>> build() async {
+  Future<PaginationResponse<AnalysisReportGroup>> build() async {
     ref.onDispose(() {
       _debounceTimer?.cancel();
     });
     return _fetchAnalysisReports();
   }
 
-  Future<PaginationResponse<AnalysisReport>> _fetchAnalysisReports() async {
+  Future<PaginationResponse<AnalysisReportGroup>> _fetchAnalysisReports() async {
     final repository = ref.read(analysisReportRepositoryProvider);
-    return await repository.getAnalysisReports(page: _currentPage, limit: _limit, search: _currentSearch);
+    return await repository.getAnalysisReportGroups(page: _currentPage, limit: _limit);
   }
 
   Future<void> fetchAnalysisReports({bool isRefresh = false}) async {
     if (isRefresh) {
       _currentPage = 1;
-      state = const AsyncLoading();
-      state = await AsyncValue.guard(() => _fetchAnalysisReports());
-    } else {
-      state = const AsyncLoading();
-      state = await AsyncValue.guard(() => _fetchAnalysisReports());
     }
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() => _fetchAnalysisReports());
   }
 
   Timer? _debounceTimer;
@@ -39,7 +39,6 @@ class AnalysisReportNotifier extends AsyncNotifier<PaginationResponse<AnalysisRe
   void search(String query) {
     if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-      _currentSearch = query;
       _currentPage = 1;
       fetchAnalysisReports();
     });
@@ -65,21 +64,23 @@ class AnalysisReportNotifier extends AsyncNotifier<PaginationResponse<AnalysisRe
       }
     }
   }
-  Future<void> deleteReport(String id) async {
+
+  /// Delete one analysis group (and every report inside it).
+  Future<void> deleteReport(String groupId) async {
     try {
       final repository = ref.read(analysisReportRepositoryProvider);
-      await repository.deleteAnalysisReport(id);
+      await repository.deleteAnalysisGroup(groupId);
       await fetchAnalysisReports(isRefresh: true);
     } catch (e) {
       rethrow;
     }
   }
 
-  Future<void> deleteReports(List<String> ids) async {
-    if (ids.isEmpty) return;
+  Future<void> deleteReports(List<String> groupIds) async {
+    if (groupIds.isEmpty) return;
     try {
       final repository = ref.read(analysisReportRepositoryProvider);
-      await repository.deleteBatchAnalysisReports(ids);
+      await repository.deleteBatchAnalysisGroups(groupIds);
       await fetchAnalysisReports(isRefresh: true);
     } catch (e) {
       rethrow;
@@ -87,6 +88,7 @@ class AnalysisReportNotifier extends AsyncNotifier<PaginationResponse<AnalysisRe
   }
 }
 
-final analysisReportProvider = AsyncNotifierProvider.autoDispose<AnalysisReportNotifier, PaginationResponse<AnalysisReport>>(() {
+final analysisReportProvider =
+    AsyncNotifierProvider.autoDispose<AnalysisReportNotifier, PaginationResponse<AnalysisReportGroup>>(() {
   return AnalysisReportNotifier();
 });
