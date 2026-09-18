@@ -8,6 +8,7 @@ import 'package:claimsupport/features/upload/presentation/screens/upload_prescri
 import 'package:claimsupport/features/upload/presentation/screens/upload_policy_screen.dart';
 import 'package:claimsupport/features/analysis/presentation/screens/consent_screen.dart';
 import 'package:claimsupport/features/analysis/presentation/screens/analysis_screen.dart';
+import 'package:claimsupport/features/analysis/presentation/screens/multi_analysis_screen.dart';
 import 'package:claimsupport/features/summary/presentation/screens/summary_screen.dart';
 import 'package:claimsupport/features/analyses_reports/presentation/screens/analyses_reports_screen.dart';
 import 'package:claimsupport/features/profile/presentation/screens/profile_screen.dart';
@@ -132,6 +133,10 @@ class AppRouter {
           GoRoute(
             path: '/analysis',
             builder: (context, state) => const AnalysisScreen(),
+          ),
+          GoRoute(
+            path: '/analysis-multi',
+            builder: (context, state) => const MultiAnalysisScreen(),
           ),
           GoRoute(
             path: '/summary',

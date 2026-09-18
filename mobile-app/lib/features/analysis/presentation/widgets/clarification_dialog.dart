@@ -609,11 +609,16 @@ class ClarificationDialog extends StatefulWidget {
   final Function(Map<String, dynamic>) onSubmit;
   final VoidCallback onCancel;
 
+  /// Optional subtitle naming which policy is asking (multi-policy analysis).
+  /// Omitted for single-policy analysis, which keeps its original wording.
+  final String? contextLabel;
+
   const ClarificationDialog({
     super.key,
     required this.clarificationData,
     required this.onSubmit,
     required this.onCancel,
+    this.contextLabel,
   });
 
   @override
@@ -778,7 +783,9 @@ class _ClarificationDialogState extends State<ClarificationDialog> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Answer to complete your coverage analysis.',
+                          widget.contextLabel != null
+                              ? 'For ${widget.contextLabel}. Other policies are unaffected.'
+                              : 'Answer to complete your coverage analysis.',
                           style: TextStyle(fontSize: 12, color: textSecondary),
                         ),
                       ],

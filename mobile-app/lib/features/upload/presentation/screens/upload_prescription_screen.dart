@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -306,7 +307,9 @@ class _UploadPrescriptionScreenState extends ConsumerState<UploadPrescriptionScr
   }
 
   void _showPolicySelectionDialog(List<dynamic> policies) {
-    String? localSelectedPolicyId;
+    // Multiple policies may be selected: the prescription is analysed against
+    // each one independently.
+    final Set<String> localSelectedPolicyIds = {};
     
     showDialog(
       context: context,
@@ -317,7 +320,24 @@ class _UploadPrescriptionScreenState extends ConsumerState<UploadPrescriptionScr
           builder: (dialogCtx, setDialogState) {
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Text("Select Policy", style: TextStyle(fontWeight: FontWeight.bold)),
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text("Select Policies", style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text(
+                    localSelectedPolicyIds.isEmpty
+                        ? "Choose one or more policies to compare"
+                        : "${localSelectedPolicyIds.length} selected",
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.normal,
+                      color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
               content: SizedBox(
                 width: double.maxFinite,
                 child: ListView.separated(
@@ -326,7 +346,7 @@ class _UploadPrescriptionScreenState extends ConsumerState<UploadPrescriptionScr
                   separatorBuilder: (context, index) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {
                     final p = policies[index];
-                    final isSelected = localSelectedPolicyId == p['id'];
+                    final isSelected = localSelectedPolicyIds.contains(p['id']);
                     
                     final String provider = p['providerName'] ?? 'Insurance Policy';
                     final String policyType = p['policyType'] ?? '';
@@ -339,7 +359,13 @@ class _UploadPrescriptionScreenState extends ConsumerState<UploadPrescriptionScr
                     return InkWell(
                       onTap: () {
                         setDialogState(() {
-                          localSelectedPolicyId = p['id'];
+                          final id = p['id']?.toString();
+                          if (id == null) return;
+                          if (localSelectedPolicyIds.contains(id)) {
+                            localSelectedPolicyIds.remove(id);
+                          } else {
+                            localSelectedPolicyIds.add(id);
+                          }
                         });
                       },
                       borderRadius: BorderRadius.circular(12),
@@ -475,8 +501,8 @@ class _UploadPrescriptionScreenState extends ConsumerState<UploadPrescriptionScr
                             Padding(
                               padding: const EdgeInsets.only(top: 2),
                               child: isSelected
-                                  ? const Icon(Icons.check_circle, color: Color(0xFF2563EB), size: 22)
-                                  : Icon(Icons.circle_outlined, color: isDark ? Colors.grey.shade600 : Colors.grey.shade400, size: 22),
+                                  ? const Icon(Icons.check_box, color: Color(0xFF2563EB), size: 22)
+                                  : Icon(Icons.check_box_outline_blank, color: isDark ? Colors.grey.shade600 : Colors.grey.shade400, size: 22),
                             ),
                           ],
                         ),
@@ -491,19 +517,33 @@ class _UploadPrescriptionScreenState extends ConsumerState<UploadPrescriptionScr
                   child: Text("Cancel", style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade700)),
                 ),
                 ElevatedButton(
-                  onPressed: localSelectedPolicyId == null ? null : () async {
+                  onPressed: localSelectedPolicyIds.isEmpty ? null : () async {
                     Navigator.of(dialogContext).pop();
                     final prefs = SharedPrefs.instance;
-                    await prefs.setString('policy_id', localSelectedPolicyId!);
+                    final selected = localSelectedPolicyIds.toList();
                     await prefs.remove('policy_path'); // Ensure policy_path is cleared
-                    if (mounted) context.push('/analysis');
+
+                    if (selected.length == 1) {
+                      // Unchanged single-policy flow
+                      await prefs.setString('policy_id', selected.first);
+                      await prefs.remove('policy_ids');
+                      if (mounted) context.push('/analysis');
+                    } else {
+                      await prefs.setString('policy_ids', jsonEncode(selected));
+                      await prefs.remove('policy_id');
+                      if (mounted) context.push('/analysis-multi');
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2563EB),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  child: const Text("Analyze With Selected Policy"),
+                  child: Text(
+                    localSelectedPolicyIds.length > 1
+                        ? "Analyze With ${localSelectedPolicyIds.length} Policies"
+                        : "Analyze With Selected Policy",
+                  ),
                 ),
               ],
             );
