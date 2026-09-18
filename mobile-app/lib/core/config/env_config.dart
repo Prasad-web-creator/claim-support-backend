@@ -7,15 +7,22 @@ enum Environment {
 }
 
 class EnvConfig {
+  // Railway's generated domain changes whenever the service is renamed or
+  // recreated, so keep it in one place: a stale copy here fails as an
+  // "Application not found" page from Railway's edge, not an app error.
+  static const _prodApiBaseUrl =
+      'https://claim-support-backend-python-production-34d1.up.railway.app/api';
+  static const _devApiBaseUrl = 'http://10.45.134.1:8000/api';
+
   static Environment _environment = kReleaseMode ? Environment.prod : Environment.dev;
   static String _apiBaseUrl = kReleaseMode
       ? const String.fromEnvironment(
           'API_BASE_URL',
-          defaultValue: 'https://claim-support-backend-python-production.up.railway.app/api',
+          defaultValue: _prodApiBaseUrl,
         )
       : const String.fromEnvironment(
           'API_BASE_URL',
-          defaultValue: 'http://10.45.134.1:8000/api',
+          defaultValue: _devApiBaseUrl,
         );
 
   static void initialize(Environment env) {
@@ -29,7 +36,7 @@ class EnvConfig {
       case Environment.prod:
         _apiBaseUrl = const String.fromEnvironment(
           'API_BASE_URL',
-          defaultValue: 'https://claim-support-backend-python-production.up.railway.app/api',
+          defaultValue: _prodApiBaseUrl,
         );
         break;
       case Environment.dev:
@@ -37,7 +44,7 @@ class EnvConfig {
             ? envFileUrl
             : const String.fromEnvironment(
                 'API_BASE_URL',
-                defaultValue: 'http://10.45.134.1:8000/api',
+                defaultValue: _devApiBaseUrl,
               );
         break;
     }
