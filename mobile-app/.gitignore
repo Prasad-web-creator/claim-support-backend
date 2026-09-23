@@ -60,3 +60,9 @@ ios/Pods/
 ios/.symlinks/
 ios/Flutter/Generated.xcconfig
 ios/Flutter/flutter_export_environment.sh
+
+# Flutter generated platform scaffolding.
+# `flutter pub get` recreates these on every machine; the desktop folders here
+# hold nothing but ephemeral/ (no tracked sources), and the plugin_symlinks are
+# absolute paths into the local pub cache, so they are never portable.
+**/ephemeral/
