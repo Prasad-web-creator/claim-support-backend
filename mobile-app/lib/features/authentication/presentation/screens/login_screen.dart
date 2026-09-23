@@ -168,7 +168,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   keyboardType: _otpSent ? TextInputType.number : TextInputType.phone,
                   inputFormatters: _otpSent ? [
                     FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(6),
+                    LengthLimitingTextInputFormatter(4),
                   ] : [
                     FilteringTextInputFormatter.digitsOnly,
                     LengthLimitingTextInputFormatter(10),

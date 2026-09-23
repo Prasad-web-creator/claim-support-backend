@@ -228,6 +228,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   hint: '0000',
                   controller: _otpController,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(4),
+                  ],
                 ),
               ],
               
