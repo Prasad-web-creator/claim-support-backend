@@ -178,7 +178,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     color: textColor,
                   ),
                   decoration: InputDecoration(
-                    hintText: _otpSent ? '000000' : '9876543210',
+                    hintText: _otpSent ? '0000' : '9876543210',
                     hintStyle: TextStyle(
                       color: isDark ? Colors.grey.shade500 : Colors.grey.shade400,
                     ),

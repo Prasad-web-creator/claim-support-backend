@@ -225,7 +225,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 _buildTextField(
                   context,
                   label: 'Enter OTP',
-                  hint: '000000',
+                  hint: '0000',
                   controller: _otpController,
                   keyboardType: TextInputType.number,
                 ),
