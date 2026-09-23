@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:claimsupport/core/network/api_client.dart';
 import 'package:claimsupport/core/utils/shared_prefs.dart';
+import 'package:claimsupport/core/utils/json_utils.dart';
 import 'package:claimsupport/features/summary/presentation/widgets/coverage_donut_chart.dart';
 
 import 'package:claimsupport/features/dashboard/presentation/controllers/dashboard_controller.dart';
@@ -91,12 +92,12 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
         final coverageBreakdown = data['coverageBreakdown'] as Map<String, dynamic>? ?? {};
         final overallStatus = data['overallStatus'] ?? 'Unknown';
         final summaryText = data['summaryText'] ?? 'No summary available.';
-        final comparison = data['comparison'] as List<dynamic>? ?? [];
+        final comparison = asList(data['comparison']);
         final policyJson = data['policyJson'] as Map<String, dynamic>? ?? {};
         final prescriptionJson = data['prescriptionJson'] as Map<String, dynamic>? ?? {};
         final processingTime = data['processingTimeMs'] ?? 0;
         // Clarification Q&A from LLM interactive session
-        final clarificationQA = data['clarificationAnswersUsed'] as List<dynamic>? ?? [];
+        final clarificationQA = asList(data['clarificationAnswersUsed']);
         // Reference benchmark comparison (from Marsh GIC Snapshot & ReAssure 3.0 Reference Standards)
         final referenceComparison = data['referenceComparison'] as Map<String, dynamic>? ?? {};
 
@@ -146,10 +147,10 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
             prescriptionJson['diagnosis'].toString().trim().isEmpty ||
             prescriptionJson['diagnosis'].toString().toLowerCase() == 'unknown' ||
             prescriptionJson['diagnosis'].toString().toLowerCase() == 'none');
-        final hasRxItems = ((prescriptionJson['medicines'] as List?)?.isNotEmpty == true) ||
-            ((prescriptionJson['medicalTests'] as List?)?.isNotEmpty == true) ||
-            ((prescriptionJson['procedures'] as List?)?.isNotEmpty == true) ||
-            ((prescriptionJson['symptoms'] as List?)?.isNotEmpty == true);
+        final hasRxItems = asList(prescriptionJson['medicines']).isNotEmpty ||
+            asList(prescriptionJson['medicalTests']).isNotEmpty ||
+            asList(prescriptionJson['procedures']).isNotEmpty ||
+            asList(prescriptionJson['symptoms']).isNotEmpty;
 
         final isManualRx = prescriptionJson['isManual'] == true ||
             data['isManualPrescription'] == true ||
@@ -1230,8 +1231,8 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
 
                     // ─── Reference Benchmark Comparison (Extra Content) ───
                     if (referenceComparison.isNotEmpty &&
-                        ((referenceComparison['featureComparisons'] as List?)?.isNotEmpty == true ||
-                         (referenceComparison['detectedPermanentExclusions'] as List?)?.isNotEmpty == true)) ...[
+                        (asList(referenceComparison['featureComparisons']).isNotEmpty ||
+                         asList(referenceComparison['detectedPermanentExclusions']).isNotEmpty)) ...[
                       _buildReferenceBenchmarkSection(
                         context: context,
                         refData: referenceComparison,
@@ -1470,8 +1471,8 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
     required Color textColor,
     required Color textSecondary,
   }) {
-    final permanentExclusions = refData['detectedPermanentExclusions'] as List<dynamic>? ?? [];
-    final featureComparisons = refData['featureComparisons'] as List<dynamic>? ?? [];
+    final permanentExclusions = asList(refData['detectedPermanentExclusions']);
+    final featureComparisons = asList(refData['featureComparisons']);
     final policyType = refData['policyType']?.toString() ?? '';
 
     if (permanentExclusions.isEmpty && featureComparisons.isEmpty) {

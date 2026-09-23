@@ -12,7 +12,7 @@ class EnvConfig {
   // "Application not found" page from Railway's edge, not an app error.
   static const _prodApiBaseUrl =
       'https://claim-support-backend-python-production-34d1.up.railway.app/api';
-  static const _devApiBaseUrl = 'http://10.45.134.1:8000/api';
+  static const _devApiBaseUrl = 'http://10.29.9.1:8000/api';
 
   static Environment _environment = kReleaseMode ? Environment.prod : Environment.dev;
   static String _apiBaseUrl = kReleaseMode
